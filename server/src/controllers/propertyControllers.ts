@@ -1,0 +1,669 @@
+import { Request, Response } from "express";
+import { PrismaClient, Prisma } from "@prisma/client";
+import { wktToGeoJSON } from "@terraformer/wkt";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Location } from "@prisma/client";
+import { Upload } from "@aws-sdk/lib-storage";
+import axios from "axios";
+
+const prisma = new PrismaClient();
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+});
+
+export const getProperties = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  console.log(`[getProperties] Request received with query params:`, req.query);
+  try {
+    const {
+      favoriteIds,
+      priceMin,
+      priceMax,
+      beds,
+      baths,
+      propertyType,
+      squareFeetMin,
+      squareFeetMax,
+      amenities,
+      availableFrom,
+      latitude,
+      longitude,
+    } = req.query;
+
+    let whereConditions: Prisma.Sql[] = [];
+
+    if (favoriteIds) {
+      const favoriteIdsArray = (favoriteIds as string).split(",").map(Number);
+      console.log(
+        `[getProperties] Filtering by favoriteIds:`,
+        favoriteIdsArray
+      );
+      whereConditions.push(
+        Prisma.sql`p.id IN (${Prisma.join(favoriteIdsArray)})`
+      );
+    }
+
+    if (priceMin) {
+      console.log(`[getProperties] Filtering by priceMin:`, priceMin);
+      whereConditions.push(
+        Prisma.sql`p."pricePerMonth" >= ${Number(priceMin)}`
+      );
+    }
+
+    if (priceMax) {
+      console.log(`[getProperties] Filtering by priceMax:`, priceMax);
+      whereConditions.push(
+        Prisma.sql`p."pricePerMonth" <= ${Number(priceMax)}`
+      );
+    }
+
+    if (beds && beds !== "any") {
+      console.log(`[getProperties] Filtering by beds:`, beds);
+      whereConditions.push(Prisma.sql`p.beds >= ${Number(beds)}`);
+    }
+
+    if (baths && baths !== "any") {
+      console.log(`[getProperties] Filtering by baths:`, baths);
+      whereConditions.push(Prisma.sql`p.baths >= ${Number(baths)}`);
+    }
+
+    if (squareFeetMin) {
+      console.log(`[getProperties] Filtering by squareFeetMin:`, squareFeetMin);
+      whereConditions.push(
+        Prisma.sql`p."squareFeet" >= ${Number(squareFeetMin)}`
+      );
+    }
+
+    if (squareFeetMax) {
+      console.log(`[getProperties] Filtering by squareFeetMax:`, squareFeetMax);
+      whereConditions.push(
+        Prisma.sql`p."squareFeet" <= ${Number(squareFeetMax)}`
+      );
+    }
+
+    if (propertyType && propertyType !== "any") {
+      console.log(`[getProperties] Filtering by propertyType:`, propertyType);
+      whereConditions.push(
+        Prisma.sql`p."propertyType" = ${propertyType}::"PropertyType"`
+      );
+    }
+
+    if (amenities && amenities !== "any") {
+      const amenitiesArray = (amenities as string).split(",");
+      console.log(`[getProperties] Filtering by amenities:`, amenitiesArray);
+      whereConditions.push(Prisma.sql`p.amenities @> ${amenitiesArray}`);
+    }
+
+    if (availableFrom && availableFrom !== "any") {
+      const availableFromDate =
+        typeof availableFrom === "string" ? availableFrom : null;
+      if (availableFromDate) {
+        console.log(
+          `[getProperties] Filtering by availableFrom:`,
+          availableFromDate
+        );
+        const date = new Date(availableFromDate);
+        if (!isNaN(date.getTime())) {
+          whereConditions.push(
+            Prisma.sql`EXISTS (
+              SELECT 1 FROM "Lease" l 
+              WHERE l."propertyId" = p.id 
+              AND l."startDate" <= ${date.toISOString()}
+            )`
+          );
+        } else {
+          console.log(
+            `[getProperties] Invalid date format for availableFrom:`,
+            availableFromDate
+          );
+        }
+      }
+    }
+
+    if (latitude && longitude) {
+      const lat = parseFloat(latitude as string);
+      const lng = parseFloat(longitude as string);
+      console.log(`[getProperties] Filtering by location:`, {
+        latitude: lat,
+        longitude: lng,
+      });
+      const radiusInKilometers = 1000;
+      const degrees = radiusInKilometers / 111; // Converts kilometers to degrees
+
+      whereConditions.push(
+        Prisma.sql`ST_DWithin(
+          l.coordinates::geometry,
+          ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326),
+          ${degrees}
+        )`
+      );
+    }
+
+    console.log(
+      `[getProperties] Constructed ${whereConditions.length} where conditions`
+    );
+
+    const completeQuery = Prisma.sql`
+      SELECT 
+        p.*,
+        json_build_object(
+          'id', l.id,
+          'address', l.address,
+          'city', l.city,
+          'state', l.state,
+          'country', l.country,
+          'postalCode', l."postalCode",
+          'coordinates', json_build_object(
+            'longitude', ST_X(l."coordinates"::geometry),
+            'latitude', ST_Y(l."coordinates"::geometry)
+          )
+        ) as location
+      FROM "Property" p
+      JOIN "Location" l ON p."locationId" = l.id
+      ${
+        whereConditions.length > 0
+          ? Prisma.sql`WHERE ${Prisma.join(whereConditions, " AND ")}`
+          : Prisma.empty
+      }
+    `;
+
+    console.log(`[getProperties] Executing query...`);
+    const properties = await prisma.$queryRaw(completeQuery);
+    console.log(
+      `[getProperties] Retrieved ${
+        Array.isArray(properties) ? properties.length : 0
+      } properties`
+    );
+
+    res.json(properties);
+  } catch (error: any) {
+    console.error(`[getProperties] Error:`, error);
+    console.error(`[getProperties] Stack trace:`, error.stack);
+    res
+      .status(500)
+      .json({ message: `Error retrieving properties: ${error.message}` });
+  }
+};
+
+export const getProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  console.log(`[getProperty] Request received for property id: ${id}`);
+
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: Number(id) },
+      include: {
+        location: true,
+      },
+    });
+
+    if (!property) {
+      console.log(`[getProperty] Property with id ${id} not found`);
+      res.status(404).json({ message: `Property with id ${id} not found` });
+      return;
+    }
+
+    // console.log(`[getProperty] Found property:`, {
+    //   id: property.id,
+    //   title: property.title,
+    //   locationId: property.locationId,
+    // });
+
+    const coordinates: { coordinates: string }[] =
+      await prisma.$queryRaw`SELECT ST_asText(coordinates) as coordinates from "Location" where id = ${property.location.id}`;
+
+    console.log(
+      `[getProperty] Raw coordinates:`,
+      coordinates[0]?.coordinates || "No coordinates found"
+    );
+
+    const geoJSON: any = wktToGeoJSON(coordinates[0]?.coordinates || "");
+    const longitude = geoJSON.coordinates[0];
+    const latitude = geoJSON.coordinates[1];
+
+    console.log(`[getProperty] Parsed coordinates:`, { longitude, latitude });
+
+    const propertyWithCoordinates = {
+      ...property,
+      location: {
+        ...property.location,
+        coordinates: {
+          longitude,
+          latitude,
+        },
+      },
+    };
+
+    res.json(propertyWithCoordinates);
+  } catch (err: any) {
+    console.error(
+      `[getProperty] Error retrieving property with id ${id}:`,
+      err
+    );
+    console.error(`[getProperty] Stack trace:`, err.stack);
+    res
+      .status(500)
+      .json({ message: `Error retrieving property: ${err.message}` });
+  }
+};
+
+export const createProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  console.log(`[createProperty] Request received`);
+  console.log(`[createProperty] Body:`, req.body);
+  console.log(
+    `[createProperty] Files:`,
+    req.files
+      ? `${(req.files as Express.Multer.File[]).length} files received`
+      : "No files received"
+  );
+
+  try {
+    const files = req.files as Express.Multer.File[];
+    const {
+      address,
+      city,
+      state,
+      country,
+      postalCode,
+      managerCognitoId,
+      ...propertyData
+    } = req.body;
+
+    console.log(`[createProperty] Processing location data:`, {
+      address,
+      city,
+      state,
+      country,
+      postalCode,
+    });
+    console.log(`[createProperty] Processing manager data:`, {
+      managerCognitoId,
+    });
+
+    console.log(`[createProperty] Uploading ${files.length} photos to S3...`);
+    const photoUrls = await Promise.all(
+      files.map(async (file, index) => {
+        console.log(
+          `[createProperty] Uploading file ${index + 1}/${files.length}: ${
+            file.originalname
+          } (${file.size} bytes)`
+        );
+        const uploadParams = {
+          Bucket: process.env.S3_BUCKET_NAME!,
+          Key: `properties/${Date.now()}-${file.originalname}`,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+
+        try {
+          const uploadResult = await new Upload({
+            client: s3Client,
+            params: uploadParams,
+          }).done();
+
+          console.log(
+            `[createProperty] File ${index + 1} uploaded successfully to ${
+              uploadResult.Location
+            }`
+          );
+          return uploadResult.Location;
+        } catch (uploadError: any) {
+          console.error(
+            `[createProperty] Error uploading file ${index + 1}:`,
+            uploadError
+          );
+          throw new Error(
+            `Failed to upload image ${file.originalname}: ${uploadError.message}`
+          );
+        }
+      })
+    );
+
+    console.log(
+      `[createProperty] All photos uploaded successfully:`,
+      photoUrls
+    );
+
+    console.log(`[createProperty] Geocoding address...`);
+    const geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
+      {
+        postalcode: postalCode,
+        format: "json",
+        limit: "1",
+      }
+    ).toString()}`;
+
+    console.log(`[createProperty] Geocoding URL:`, geocodingUrl);
+
+    const geocodingResponse = await axios.get(geocodingUrl, {
+      headers: {
+        "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com",
+      },
+    });
+
+    console.log(
+      `[createProperty] Geocoding response:`,
+      geocodingResponse.data && geocodingResponse.data.length > 0
+        ? {
+            lon: geocodingResponse.data[0]?.lon,
+            lat: geocodingResponse.data[0]?.lat,
+          }
+        : "No geocoding results found"
+    );
+
+    const [longitude, latitude] =
+      geocodingResponse.data[0]?.lon && geocodingResponse.data[0]?.lat
+        ? [
+            parseFloat(geocodingResponse.data[0]?.lon),
+            parseFloat(geocodingResponse.data[0]?.lat),
+          ]
+        : [0, 0];
+
+    console.log(`[createProperty] Final coordinates:`, { longitude, latitude });
+
+    // create location
+    console.log(`[createProperty] Creating location record...`);
+    const [location] = await prisma.$queryRaw<Location[]>`
+      INSERT INTO "Location" (address, city, state, country, "postalCode", coordinates)
+      VALUES (${address}, ${city}, ${state}, ${country}, ${postalCode}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
+      RETURNING id, address, city, state, country, "postalCode", ST_AsText(coordinates) as coordinates;
+    `;
+
+    console.log(`[createProperty] Location created:`, {
+      id: location.id,
+      address: location.address,
+    });
+
+    // Process property data
+    console.log(
+      `[createProperty] Processing property data before database insertion`
+    );
+    const amenitiesArray =
+      typeof propertyData.amenities === "string"
+        ? propertyData.amenities.split(",")
+        : [];
+
+    const highlightsArray =
+      typeof propertyData.highlights === "string"
+        ? propertyData.highlights.split(",")
+        : [];
+
+    console.log(`[createProperty] Processed amenities:`, amenitiesArray);
+    console.log(`[createProperty] Processed highlights:`, highlightsArray);
+
+    // create property
+    console.log(`[createProperty] Creating property record...`);
+    const newProperty = await prisma.property.create({
+      data: {
+        ...propertyData,
+        photoUrls,
+        locationId: location.id,
+        managerCognitoId,
+        amenities: amenitiesArray,
+        highlights: highlightsArray,
+        isPetsAllowed: propertyData.isPetsAllowed === "true",
+        isParkingIncluded: propertyData.isParkingIncluded === "true",
+        pricePerMonth: parseFloat(propertyData.pricePerMonth),
+        securityDeposit: parseFloat(propertyData.securityDeposit),
+        applicationFee: parseFloat(propertyData.applicationFee),
+        beds: parseInt(propertyData.beds),
+        baths: parseFloat(propertyData.baths),
+        squareFeet: parseInt(propertyData.squareFeet),
+      },
+      include: {
+        location: true,
+        manager: true,
+      },
+    });
+
+    console.log(
+      `[createProperty] Property created successfully with id: ${newProperty.id}`
+    );
+    res.status(201).json(newProperty);
+  } catch (err: any) {
+    console.error(`[createProperty] Error:`, err);
+    console.error(`[createProperty] Stack trace:`, err.stack);
+    res
+      .status(500)
+      .json({ message: `Error creating property: ${err.message}` });
+  }
+};
+export const updateProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const files = req.files as Express.Multer.File[];
+  const {
+    address,
+    city,
+    state,
+    country,
+    postalCode,
+    existingPhotoUrls,
+    deletedPhotoUrls,
+    ...propertyData
+  } = req.body;
+  console.log("req.body", req.body);
+
+  try {
+    // Get existing property first
+    const existingProperty = await prisma.property.findUnique({
+      where: { id: Number(id) },
+      include: { location: true },
+    });
+
+    if (!existingProperty) {
+      res.status(404).json({ message: "Property not found" });
+      return;
+    }
+
+    // Parse the photo URLs from the request and ensure they're all strings
+    let photosToKeep: string[] = [];
+    if (existingPhotoUrls) {
+      try {
+        const parsed = JSON.parse(existingPhotoUrls);
+        if (Array.isArray(parsed)) {
+          photosToKeep = parsed.filter(
+            (url): url is string =>
+              typeof url === "string" && url !== undefined && url !== null
+          );
+        }
+      } catch (e) {
+        console.error("Error parsing existingPhotoUrls:", e);
+      }
+    } else if (Array.isArray(existingProperty.photoUrls)) {
+      photosToKeep = existingProperty.photoUrls.filter(
+        (url): url is string =>
+          typeof url === "string" && url !== undefined && url !== null
+      );
+    }
+
+    // Parse the deleted photo URLs
+    let photosToDelete: string[] = [];
+    if (deletedPhotoUrls) {
+      try {
+        const parsed = JSON.parse(deletedPhotoUrls);
+        if (Array.isArray(parsed)) {
+          photosToDelete = parsed.filter(
+            (url): url is string =>
+              typeof url === "string" && url !== undefined && url !== null
+          );
+        }
+      } catch (e) {
+        console.error("Error parsing deletedPhotoUrls:", e);
+      }
+    }
+
+    // Handle photo uploads if new files are provided
+    const newPhotoUrls: string[] = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        try {
+          const uploadParams = {
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: `properties/${Date.now()}-${file.originalname}`,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+          };
+
+          const uploadResult = await new Upload({
+            client: s3Client,
+            params: uploadParams,
+          }).done();
+
+          if (uploadResult.Location) {
+            newPhotoUrls.push(uploadResult.Location);
+          }
+        } catch (err) {
+          console.error(`Error uploading file ${file.originalname}:`, err);
+        }
+      }
+    }
+
+    // Delete removed images from S3
+    if (photosToDelete.length > 0) {
+      for (const url of photosToDelete) {
+        try {
+          const key = url.split("/").pop();
+          if (key) {
+            await s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: process.env.S3_BUCKET_NAME!,
+                Key: `properties/${key}`,
+              })
+            );
+            console.log(`Deleted image from S3: ${url}`);
+          }
+        } catch (err) {
+          console.error(`Error deleting image ${url}:`, err);
+        }
+      }
+    }
+
+    // Combine kept and new photo URLs - ensure all values are strings
+    const allPhotoUrls: string[] = [
+      ...photosToKeep.filter((url) => !photosToDelete.includes(url)),
+      ...newPhotoUrls,
+    ];
+
+    // Update location if address details changed
+    let locationId = existingProperty.locationId;
+    if (address || city || state || country || postalCode) {
+      const [location] = await prisma.$queryRaw<Location[]>`
+        UPDATE "Location"
+        SET 
+          address = COALESCE(${address}, address),
+          city = COALESCE(${city}, city),
+          state = COALESCE(${state}, state),
+          country = COALESCE(${country}, country),
+          "postalCode" = COALESCE(${postalCode}, "postalCode")
+        WHERE id = ${existingProperty.locationId}
+        RETURNING id;
+      `;
+      locationId = location.id;
+    }
+
+    // Process property data with proper type safety
+    const amenitiesArray: string[] = propertyData.amenities
+      ? typeof propertyData.amenities === "string"
+        ? propertyData.amenities.split(",").filter(Boolean)
+        : Array.isArray(propertyData.amenities)
+        ? propertyData.amenities.filter(
+            (item: any): item is string =>
+              typeof item === "string" && Boolean(item)
+          )
+        : existingProperty.amenities || []
+      : existingProperty.amenities || [];
+
+    const highlightsArray: string[] = propertyData.highlights
+      ? typeof propertyData.highlights === "string"
+        ? propertyData.highlights.split(",").filter(Boolean)
+        : Array.isArray(propertyData.highlights)
+        ? propertyData.highlights.filter(
+            (item: any): item is string =>
+              typeof item === "string" && Boolean(item)
+          )
+        : existingProperty.highlights || []
+      : existingProperty.highlights || [];
+
+    // Update property with strict typing
+    const updatedProperty = await prisma.property.update({
+      where: { id: Number(id) },
+      data: {
+        ...propertyData,
+        photoUrls: allPhotoUrls as string[], // Explicitly cast to string[]
+        locationId,
+        amenities: amenitiesArray as any[], // Cast to any[] for Prisma enum array
+        highlights: highlightsArray as any[], // Cast to any[] for Prisma enum array
+        isPetsAllowed: propertyData.isPetsAllowed === "true",
+        isParkingIncluded: propertyData.isParkingIncluded === "true",
+        pricePerMonth: parseFloat(propertyData.pricePerMonth) || 0,
+        securityDeposit: parseFloat(propertyData.securityDeposit) || 0,
+        applicationFee: parseFloat(propertyData.applicationFee) || 0,
+        beds: parseInt(propertyData.beds) || 0,
+        baths: parseFloat(propertyData.baths) || 0,
+        squareFeet: parseInt(propertyData.squareFeet) || 0,
+      },
+      include: {
+        location: true,
+        manager: true,
+      },
+    });
+
+    res.json(updatedProperty);
+  } catch (err: any) {
+    console.error("Error updating property:", err);
+    res.status(500).json({
+      message: `Error updating property: ${err.message}`,
+      error: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    });
+  }
+};
+
+export const deleteProperty = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+
+  try {
+    // First get the property to access locationId
+    const property = await prisma.property.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!property) {
+      res.status(404).json({ message: "Property not found" });
+      return;
+    }
+
+    // Delete the property (this will cascade to related records)
+    await prisma.property.delete({
+      where: { id: Number(id) },
+    });
+
+    // Delete the location (if no other properties reference it)
+    await prisma.location.deleteMany({
+      where: {
+        id: property.locationId,
+        properties: { none: {} },
+      },
+    });
+
+    res.status(204).send();
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: `Error deleting property: ${err.message}` });
+  }
+};

@@ -1,0 +1,306 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum Highlight {
+  HighSpeedInternetAccess
+  WasherDryer
+  AirConditioning
+  Heating
+  SmokeFree
+  CableReady
+  SatelliteTV
+  DoubleVanities
+  TubShower
+  Intercom
+  SprinklerSystem
+  RecentlyRenovated
+  CloseToTransit
+  GreatView
+  QuietNeighborhood
+  Waterfront
+  MountainView
+  CityView
+  HistoricBuilding
+  NewConstruction
+  EnergyEfficient
+  SmartTechnology
+  PetFriendly
+  ChildFriendly
+  SeniorFriendly
+  LuxuryFinishes
+  OpenConcept
+  HighCeilings
+  NaturalLight
+  PrivateOutdoorSpace
+  WalkableArea
+  BikeFriendly
+}
+
+enum Amenity {
+  WasherDryer
+  AirConditioning
+  Dishwasher
+  HighSpeedInternet
+  HardwoodFloors
+  WalkInClosets
+  Microwave
+  Refrigerator
+  Pool
+  Gym
+  Parking
+  PetsAllowed
+  WiFi
+  Balcony
+  Garden
+  Terrace
+  Fireplace
+  Elevator
+  Doorman
+  SecuritySystem
+  SmartHome
+  Furnished
+  WheelchairAccess
+  BikeStorage
+  EVCharging
+  LaundryRoom
+  Storage
+  CentralHeating
+  SolarPanels
+  GreenSpace
+  Concierge
+  BreakfastIncluded
+  CleaningService
+}
+
+enum PropertyType {
+  Rooms
+  Tinyhouse
+  Apartment
+  Villa
+  Townhouse
+  Cottage
+  Studio
+  Loft
+  Condo
+  Bungalow
+  Cabin
+  Chalet
+  Farmhouse
+  Houseboat
+  RV
+  Camper
+  MobileHome
+  Duplex
+  Triplex
+  Penthouse
+  Mansion
+  Castle
+  SharedHouse
+  CoLiving
+  StudentHousing
+  SeniorHousing
+  ServicedApartment
+  BoutiqueHotel
+  OfficeSpace
+  CoworkingSpace
+  RetailStore
+  RestaurantSpace
+  Warehouse
+  MedicalOffice
+  IndustrialFlex
+  DataCenter
+  ColdStorage
+  Showroom
+  GasStation
+  SelfStorage
+  ParkingLot
+  Hotel
+  Billboard
+  CellTower
+  AgriculturalLand
+  DarkKitchen
+  LabSpace
+  Cleanroom
+}
+enum ApplicationStatus {
+  Pending
+  Denied
+  Approved
+}
+
+enum PaymentStatus {
+  Pending
+  Paid
+  PartiallyPaid
+  Overdue
+}
+
+model Property {
+  id                Int          @id @default(autoincrement())
+  name              String
+  description       String
+  pricePerMonth     Float
+  securityDeposit   Float
+  applicationFee    Float
+  photoUrls         String[]
+  amenities         Amenity[]
+  highlights        Highlight[]
+  isPetsAllowed     Boolean      @default(false)
+  isParkingIncluded Boolean      @default(false)
+  beds              Int
+  baths             Float
+  squareFeet        Int
+  propertyType      PropertyType
+  postedDate        DateTime     @default(now())
+  averageRating     Float?       @default(0)
+  numberOfReviews   Int?         @default(0)
+  locationId        Int
+  managerCognitoId  String
+
+  location     Location      @relation(fields: [locationId], references: [id])
+  manager      Manager       @relation(fields: [managerCognitoId], references: [cognitoId])
+  leases       Lease[]
+  applications Application[]
+  favoritedBy  Tenant[]      @relation("TenantFavorites")
+  tenants      Tenant[]      @relation("TenantProperties")
+  chats Chat[]
+
+
+}
+
+model Manager {
+  id          Int    @id @default(autoincrement())
+  cognitoId   String @unique
+  name        String
+  email       String
+  phoneNumber String
+
+  managedProperties Property[]
+
+  trustScore    Int      @default(0)
+  profilePhoto  String?
+  occupation    String?
+  verifiedId    Boolean  @default(false)
+    chats Chat[]
+
+}
+
+model Tenant {
+  id          Int    @id @default(autoincrement())
+  cognitoId   String @unique
+  name        String
+  email       String
+  phoneNumber String
+
+  properties   Property[]    @relation("TenantProperties")
+  favorites    Property[]    @relation("TenantFavorites")
+  applications Application[]
+  leases       Lease[]
+
+  trustScore    Int      @default(0)
+  profilePhoto  String?
+  occupation    String?
+  verifiedId    Boolean  @default(false)
+  chats Chat[]
+
+
+}
+
+model Location {
+  id          Int                                   @id @default(autoincrement())
+  address     String
+  city        String
+  state       String
+  country     String
+  postalCode  String
+  coordinates Unsupported("geography(Point, 4326)")
+
+  properties Property[]
+}
+
+model Application {
+  id              Int               @id @default(autoincrement())
+  applicationDate DateTime
+  status          ApplicationStatus
+  propertyId      Int
+  tenantCognitoId String
+  name            String
+  email           String
+  phoneNumber     String
+  message         String?
+  leaseId         Int?              @unique
+
+  property Property @relation(fields: [propertyId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantCognitoId], references: [cognitoId])
+  lease    Lease?   @relation(fields: [leaseId], references: [id])
+}
+
+model Lease {
+  id              Int      @id @default(autoincrement())
+  startDate       DateTime
+  endDate         DateTime
+  rent            Float
+  deposit         Float
+  propertyId      Int
+  tenantCognitoId String
+
+  property    Property     @relation(fields: [propertyId], references: [id])
+  tenant      Tenant       @relation(fields: [tenantCognitoId], references: [cognitoId])
+  application Application?
+  payments    Payment[]
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  amountDue     Float
+  amountPaid    Float
+  dueDate       DateTime
+  paymentDate   DateTime
+  paymentStatus PaymentStatus
+  leaseId       Int
+
+  lease Lease @relation(fields: [leaseId], references: [id])
+}
+
+
+model Chat {
+  id            Int       @id @default(autoincrement())
+  propertyId    Int
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [cognitoId], onDelete: Cascade)
+  managerId     String
+  manager       Manager   @relation(fields: [managerId], references: [cognitoId], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+  isDeleted     Boolean   @default(false)
+
+  @@unique([propertyId, tenantId, managerId])
+}
+
+model Message {
+  id        Int       @id @default(autoincrement())
+  chatId    Int
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String    // cognitoId of the sender (tenant or manager)
+  content   String
+  attachments String[] // URLs to attached images/videos
+  timestamp DateTime  @default(now())
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+}
+
+model UserStatus {
+  userId    String    @id // cognitoId of the user
+  isOnline  Boolean   @default(false)
+  lastSeen  DateTime  @default(now())
+}
