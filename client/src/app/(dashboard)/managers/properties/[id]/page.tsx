@@ -297,7 +297,7 @@ const EditProperty = () => {
             <div className="flex gap-4">
               <button
                 type="submit"
-                className="bg-primary-700 text-black flex-1"
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#004B93] rounded-lg hover:bg-[#004B93] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:bg-[#004B93] disabled:bg-blue-300 dark:bg-blue-500 dark:hover:bg-[#004B93]"
               >
                 Update Property
               </button>
@@ -312,7 +312,7 @@ const EditProperty = () => {
           </form>
         </Form>
       </div>
-    </div>
+    </div >
   );
 };
 

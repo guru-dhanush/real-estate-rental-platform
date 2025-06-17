@@ -124,7 +124,7 @@ export const getCurrentResidences = async (
       `[getCurrentResidences] Processing location coordinates for each property`
     );
     const residencesWithFormattedLocation = await Promise.all(
-      properties.map(async (property) => {
+      properties.map(async (property: any) => {
         console.log(
           `[getCurrentResidences] Processing property ID: ${property.id}`
         );
@@ -199,7 +199,7 @@ export const addFavoriteProperty = async (
       `[addFavoriteProperty] Tenant has ${existingFavorites.length} existing favorites`
     );
 
-    if (!existingFavorites.some((fav) => fav.id === propertyIdNumber)) {
+    if (!existingFavorites.some((fav: any) => fav.id === propertyIdNumber)) {
       console.log(
         `[addFavoriteProperty] Adding new favorite property with ID: ${propertyIdNumber}`
       );

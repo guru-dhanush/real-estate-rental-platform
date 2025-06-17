@@ -9,6 +9,7 @@ import {
   Facebook,
   Linkedin,
 } from "lucide-react";
+import Link from "next/link";
 
 const Footer = () => {
   return (
@@ -17,10 +18,9 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <div>
             <div className="flex items-center mb-4">
-              <Home className="w-6 h-6 text-emerald-600 mr-2" />
-              <h3 className="text-xl font-semibold text-gray-900">
-                <span className="text-emerald-600">Emerald</span> Estates
-              </h3>
+              <Link href="/" className="flex items-center text-3xl font-bold text-[#004B93]">
+                Dwelt <span className="text-[#c9002b]">in</span>
+              </Link>
             </div>
             <p className="text-gray-600 mb-6 leading-relaxed">
               Find your perfect rental property with our premium platform.

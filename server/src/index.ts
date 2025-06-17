@@ -8,6 +8,7 @@ import http from "http";
 import path from "path";
 import { authMiddleware } from "./middleware/authMiddleware";
 import { initializeSocketService } from "./services/socketService";
+import { PrismaClient } from "@prisma/client";
 
 /* ROUTE IMPORT */
 import tenantRoutes from "./routes/tenantRoutes";
@@ -51,6 +52,29 @@ app.use(errorHandler);
 
 /* SERVER */
 const port = Number(process.env.PORT) || 3002;
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Server running on port ${port}`);
+
+/* INITIALIZE PRISMA */
+const prisma = new PrismaClient();
+
+async function startServer() {
+  try {
+    // Connect to database
+    await prisma.$connect();
+    console.log("Connected to database");
+
+    // Start server
+    server.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+// Handle cleanup
+process.on("beforeExit", async () => {
+  await prisma.$disconnect();
 });

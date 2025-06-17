@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
 import { Building, Heart, MessageCircle, Settings } from "lucide-react";
 import { HorizontaLDots } from "@/icons";
+import { Dweltin } from "@/components/Dweltin";
 
 type NavItem = {
   name: string;
@@ -103,24 +104,14 @@ const AppSidebar = ({ userType }: { userType: string }) => {
         className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
           }`}
       >
-        <Link href="/">
+        <div>
           {isExpanded || isHovered || isMobileOpen ? (
-            <Image
-              src="/images/logo/logo.svg" // Update with your logo
-              alt="Logo"
-              width={150}
-              height={40}
-              className="dark:hidden"
+            <Dweltin className="dark:hidden"
             />
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg" // Update with your icon logo
-              alt="Logo"
-              width={32}
-              height={32}
-            />
+            <Dweltin short={true} />
           )}
-        </Link>
+        </div>
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">

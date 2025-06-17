@@ -93,7 +93,7 @@ const ChatListPage = () => {
           </p>
           <button
             onClick={() => refetch()}
-            className="w-full max-w-xs mx-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-sm transition-colors"
+            className="w-full max-w-xs mx-auto bg-[#004B93] hover:bg-[#004B93] text-white px-6 py-2 rounded-lg shadow-sm transition-colors"
           >
             Retry
           </button>
@@ -137,7 +137,7 @@ const ChatListPage = () => {
           {!searchQuery && (
             <Link
               href="/properties"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-sm transition-colors"
+              className="bg-[#004B93] hover:bg-[#004B93] text-white px-6 py-2 rounded-lg shadow-sm transition-colors"
             >
               Browse Properties
             </Link>
@@ -164,7 +164,7 @@ const ChatListPage = () => {
                   className="rounded-full object-cover border border-gray-200 shadow-sm"
                 />
               ) : (
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-[#004B93] text-white shadow-sm">
                   <User size={24} />
                 </div>
               )}
@@ -202,7 +202,7 @@ const ChatListPage = () => {
             {/* Unread indicator */}
             <div className="ml-4 flex flex-col items-center">
               {getUnreadCount(chat) > 0 && (
-                <span className="bg-blue-600 text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center mb-1">
+                <span className="bg-[#004B93] text-white text-xs font-medium rounded-full h-5 w-5 flex items-center justify-center mb-1">
                   {getUnreadCount(chat)}
                 </span>
               )}

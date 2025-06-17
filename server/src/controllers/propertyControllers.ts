@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { wktToGeoJSON } from "@terraformer/wkt";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { Location } from "@prisma/client";
 import { Upload } from "@aws-sdk/lib-storage";
 import axios from "axios";
 
@@ -11,6 +10,15 @@ const prisma = new PrismaClient();
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
 });
+
+interface LocationResult {
+  id: number;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  postalCode: string;
+}
 
 export const getProperties = async (
   req: Request,
@@ -33,7 +41,7 @@ export const getProperties = async (
       longitude,
     } = req.query;
 
-    let whereConditions: Prisma.Sql[] = [];
+    let whereConditions: string[] = [];
 
     if (favoriteIds) {
       const favoriteIdsArray = (favoriteIds as string).split(",").map(Number);
@@ -42,59 +50,61 @@ export const getProperties = async (
         favoriteIdsArray
       );
       whereConditions.push(
-        Prisma.sql`p.id IN (${Prisma.join(favoriteIdsArray)})`
+        `p.id IN (${favoriteIdsArray.map((id) => Number(id)).join(",")})`
       );
     }
 
     if (priceMin) {
       console.log(`[getProperties] Filtering by priceMin:`, priceMin);
       whereConditions.push(
-        Prisma.sql`p."pricePerMonth" >= ${Number(priceMin)}`
+        `p."pricePerMonth" >= ${Number(priceMin)}`
       );
     }
 
     if (priceMax) {
       console.log(`[getProperties] Filtering by priceMax:`, priceMax);
       whereConditions.push(
-        Prisma.sql`p."pricePerMonth" <= ${Number(priceMax)}`
+        `p."pricePerMonth" <= ${Number(priceMax)}`
       );
     }
 
     if (beds && beds !== "any") {
       console.log(`[getProperties] Filtering by beds:`, beds);
-      whereConditions.push(Prisma.sql`p.beds >= ${Number(beds)}`);
+      whereConditions.push(`p.beds >= ${Number(beds)}`);
     }
 
     if (baths && baths !== "any") {
       console.log(`[getProperties] Filtering by baths:`, baths);
-      whereConditions.push(Prisma.sql`p.baths >= ${Number(baths)}`);
+      whereConditions.push(`p.baths >= ${Number(baths)}`);
     }
 
     if (squareFeetMin) {
       console.log(`[getProperties] Filtering by squareFeetMin:`, squareFeetMin);
       whereConditions.push(
-        Prisma.sql`p."squareFeet" >= ${Number(squareFeetMin)}`
+        `p."squareFeet" >= ${Number(squareFeetMin)}`
       );
     }
 
     if (squareFeetMax) {
       console.log(`[getProperties] Filtering by squareFeetMax:`, squareFeetMax);
       whereConditions.push(
-        Prisma.sql`p."squareFeet" <= ${Number(squareFeetMax)}`
+        `p."squareFeet" <= ${Number(squareFeetMax)}`
       );
     }
 
     if (propertyType && propertyType !== "any") {
       console.log(`[getProperties] Filtering by propertyType:`, propertyType);
       whereConditions.push(
-        Prisma.sql`p."propertyType" = ${propertyType}::"PropertyType"`
+        `p."propertyType" = '${propertyType}'`
       );
     }
 
     if (amenities && amenities !== "any") {
       const amenitiesArray = (amenities as string).split(",");
       console.log(`[getProperties] Filtering by amenities:`, amenitiesArray);
-      whereConditions.push(Prisma.sql`p.amenities @> ${amenitiesArray}`);
+      whereConditions.push(
+        `p.amenities @> ARRAY[${amenitiesArray.map((a) => `'${a}'`).join(",")}]::"Amenity"[]`
+      );
     }
 
     if (availableFrom && availableFrom !== "any") {
@@ -108,10 +118,10 @@ export const getProperties = async (
         const date = new Date(availableFromDate);
         if (!isNaN(date.getTime())) {
           whereConditions.push(
-            Prisma.sql`EXISTS (
+            `EXISTS (
               SELECT 1 FROM "Lease" l 
               WHERE l."propertyId" = p.id 
-              AND l."startDate" <= ${date.toISOString()}
+              AND l."startDate" <= '${date.toISOString()}'
             )`
           );
         } else {
@@ -134,7 +144,7 @@ export const getProperties = async (
       const degrees = radiusInKilometers / 111; // Converts kilometers to degrees
 
       whereConditions.push(
-        Prisma.sql`ST_DWithin(
+        `ST_DWithin(
           l.coordinates::geometry,
           ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326),
           ${degrees}
@@ -146,7 +156,12 @@ export const getProperties = async (
       `[getProperties] Constructed ${whereConditions.length} where conditions`
     );
 
-    const completeQuery = Prisma.sql`
+    const whereClause =
+      whereConditions.length > 0
+        ? `WHERE ${whereConditions.join(" AND ")}`
+        : "";
+
+    const completeQuery = `
       SELECT 
         p.*,
         json_build_object(
@@ -163,18 +178,13 @@ export const getProperties = async (
         ) as location
       FROM "Property" p
       JOIN "Location" l ON p."locationId" = l.id
-      ${
-        whereConditions.length > 0
-          ? Prisma.sql`WHERE ${Prisma.join(whereConditions, " AND ")}`
-          : Prisma.empty
-      }
+      ${whereClause}
     `;
 
     console.log(`[getProperties] Executing query...`);
-    const properties = await prisma.$queryRaw(completeQuery);
+    const properties = await prisma.$queryRawUnsafe(completeQuery);
     console.log(
-      `[getProperties] Retrieved ${
-        Array.isArray(properties) ? properties.length : 0
+      `[getProperties] Retrieved ${Array.isArray(properties) ? properties.length : 0
       } properties`
     );
 
@@ -293,8 +303,7 @@ export const createProperty = async (
     const photoUrls = await Promise.all(
       files.map(async (file, index) => {
         console.log(
-          `[createProperty] Uploading file ${index + 1}/${files.length}: ${
-            file.originalname
+          `[createProperty] Uploading file ${index + 1}/${files.length}: ${file.originalname
           } (${file.size} bytes)`
         );
         const uploadParams = {
@@ -311,8 +320,7 @@ export const createProperty = async (
           }).done();
 
           console.log(
-            `[createProperty] File ${index + 1} uploaded successfully to ${
-              uploadResult.Location
+            `[createProperty] File ${index + 1} uploaded successfully to ${uploadResult.Location
             }`
           );
           return uploadResult.Location;
@@ -354,29 +362,30 @@ export const createProperty = async (
       `[createProperty] Geocoding response:`,
       geocodingResponse.data && geocodingResponse.data.length > 0
         ? {
-            lon: geocodingResponse.data[0]?.lon,
-            lat: geocodingResponse.data[0]?.lat,
-          }
+          lon: geocodingResponse.data[0]?.lon,
+          lat: geocodingResponse.data[0]?.lat,
+        }
         : "No geocoding results found"
     );
 
     const [longitude, latitude] =
       geocodingResponse.data[0]?.lon && geocodingResponse.data[0]?.lat
         ? [
-            parseFloat(geocodingResponse.data[0]?.lon),
-            parseFloat(geocodingResponse.data[0]?.lat),
-          ]
+          parseFloat(geocodingResponse.data[0]?.lon),
+          parseFloat(geocodingResponse.data[0]?.lat),
+        ]
         : [0, 0];
 
     console.log(`[createProperty] Final coordinates:`, { longitude, latitude });
 
     // create location
     console.log(`[createProperty] Creating location record...`);
-    const [location] = await prisma.$queryRaw<Location[]>`
+    const locationResult = await prisma.$queryRawUnsafe(`
       INSERT INTO "Location" (address, city, state, country, "postalCode", coordinates)
-      VALUES (${address}, ${city}, ${state}, ${country}, ${postalCode}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
+      VALUES ('${address}', '${city}', '${state}', '${country}', '${postalCode}', ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
       RETURNING id, address, city, state, country, "postalCode", ST_AsText(coordinates) as coordinates;
-    `;
+    `);
+    const location = Array.isArray(locationResult) ? locationResult[0] : locationResult;
 
     console.log(`[createProperty] Location created:`, {
       id: location.id,
@@ -474,7 +483,7 @@ export const updateProperty = async (
         const parsed = JSON.parse(existingPhotoUrls);
         if (Array.isArray(parsed)) {
           photosToKeep = parsed.filter(
-            (url): url is string =>
+            (url: unknown): url is string =>
               typeof url === "string" && url !== undefined && url !== null
           );
         }
@@ -483,7 +492,7 @@ export const updateProperty = async (
       }
     } else if (Array.isArray(existingProperty.photoUrls)) {
       photosToKeep = existingProperty.photoUrls.filter(
-        (url): url is string =>
+        (url: unknown): url is string =>
           typeof url === "string" && url !== undefined && url !== null
       );
     }
@@ -495,7 +504,7 @@ export const updateProperty = async (
         const parsed = JSON.parse(deletedPhotoUrls);
         if (Array.isArray(parsed)) {
           photosToDelete = parsed.filter(
-            (url): url is string =>
+            (url: unknown): url is string =>
               typeof url === "string" && url !== undefined && url !== null
           );
         }
@@ -559,7 +568,7 @@ export const updateProperty = async (
     // Update location if address details changed
     let locationId = existingProperty.locationId;
     if (address || city || state || country || postalCode) {
-      const [location] = await prisma.$queryRaw<Location[]>`
+      const [location] = await prisma.$queryRaw<LocationResult[]>`
         UPDATE "Location"
         SET 
           address = COALESCE(${address}, address),
@@ -578,22 +587,22 @@ export const updateProperty = async (
       ? typeof propertyData.amenities === "string"
         ? propertyData.amenities.split(",").filter(Boolean)
         : Array.isArray(propertyData.amenities)
-        ? propertyData.amenities.filter(
+          ? propertyData.amenities.filter(
             (item: any): item is string =>
               typeof item === "string" && Boolean(item)
           )
-        : existingProperty.amenities || []
+          : existingProperty.amenities || []
       : existingProperty.amenities || [];
 
     const highlightsArray: string[] = propertyData.highlights
       ? typeof propertyData.highlights === "string"
         ? propertyData.highlights.split(",").filter(Boolean)
         : Array.isArray(propertyData.highlights)
-        ? propertyData.highlights.filter(
+          ? propertyData.highlights.filter(
             (item: any): item is string =>
               typeof item === "string" && Boolean(item)
           )
-        : existingProperty.highlights || []
+          : existingProperty.highlights || []
       : existingProperty.highlights || [];
 
     // Update property with strict typing

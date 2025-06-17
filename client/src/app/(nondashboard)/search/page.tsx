@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import Loading from "@/components/Loading";
 import { NAVBAR_HEIGHT } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/state/redux";
 import { useSearchParams } from "next/navigation";
@@ -7,9 +9,13 @@ import React, { useEffect, useState } from "react";
 import FiltersBar from "./FiltersBar";
 import FiltersFull from "./FiltersFull";
 import { cleanParams } from "@/lib/utils";
-import { setFilters } from "@/state";
-import Map from "./Map";
+import { FiltersState, setFilters } from "@/state";
 import Listings from "./Listings";
+
+const Map = dynamic(() => import('./Map'), {
+  loading: () => <Loading />,
+  ssr: false,
+});
 
 const SearchPage = () => {
   const searchParams = useSearchParams();
@@ -20,30 +26,48 @@ const SearchPage = () => {
   const [isGeolocationLoaded, setIsGeolocationLoaded] = useState(false);
   const mapViewEnabled = useAppSelector((state) => state.global.mapViewEnabled);
 
-  // This effect handles URL parameters
+  // Handle URL parameters and geocoding
   useEffect(() => {
-    const initialFilters = Array.from(searchParams.entries()).reduce(
-      (acc: any, [key, value]) => {
-        if (key === "priceRange" || key === "squareFeet") {
-          acc[key] = value.split(",").map((v) => (v === "" ? null : Number(v)));
-        } else if (key === "coordinates") {
-          acc[key] = value.split(",").map(Number);
-        } else {
-          acc[key] = value === "any" ? null : value;
+    const fetchLocationCoordinates = async (locationName: string) => {
+      try {
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+            locationName
+          )}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN}`
+        );
+        const data = await response.json();
+
+        if (data.features && data.features.length > 0) {
+          const [lng, lat] = data.features[0].center;
+          return [lng, lat] as [number, number];
         }
+        return undefined;
+      } catch (error) {
+        console.error("Error fetching coordinates:", error);
+        return undefined;
+      }
+    };
 
-        return acc;
-      },
-      {}
-    );
+    const initializeFilters = async () => {
+      const location = searchParams.get('location');
+      const propertyType = searchParams.get('propertyType');
+      let coordinates: [number, number] | undefined;
 
-    const cleanedFilters = cleanParams(initialFilters);
+      if (location) {
+        coordinates = await fetchLocationCoordinates(location);
+      }
 
-    // Only set filters from URL if there are parameters
-    if (Object.keys(cleanedFilters).length > 0) {
-      dispatch(setFilters(cleanedFilters));
-      setIsGeolocationLoaded(true); // Skip geolocation if URL params exist
-    }
+      const filters: Partial<FiltersState> = {
+        location: location || undefined,
+        propertyType: propertyType || undefined,
+        coordinates,
+      };
+
+      dispatch(setFilters(filters));
+      setIsGeolocationLoaded(true);
+    };
+
+    initializeFilters();
   }, [searchParams, dispatch]);
 
   // This effect handles geolocation - now using Google Maps Geocoding
@@ -123,11 +147,12 @@ const SearchPage = () => {
         <div className="flex-1 flex overflow-hidden">
           {mapViewEnabled ? (
             <>
-              <div className="w-7/12 overflow-y-auto pr-2 scrollbar-hide">
+              <div className="w-7/12 lg:block hidden overflow-y-auto pr-2 scrollbar-hide">
                 <Listings />
               </div>
-
-              <Map />
+              <div className="flex-1">
+                <Map />
+              </div>
             </>
           ) : (
             <div className="w-full overflow-y-auto">
@@ -138,9 +163,7 @@ const SearchPage = () => {
 
         {/* Filters panel */}
         <div
-          className={`h-full overflow-auto transition-all duration-300 ease-in-out ${isFiltersFullOpen
-            ? "w-72 opacity-100 visible ml-2"
-            : "w-0 opacity-0 invisible"
+          className={`h-full overflow-auto transition-all duration-300 ease-in-out ${isFiltersFullOpen ? "w-72 opacity-100 visible ml-2" : "w-0 opacity-0 invisible"
             }`}
         >
           <FiltersFull />

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
       use: ["@svgr/webpack"],
     });
     return config;
-  },  images: {
+  }, images: {
     remotePatterns: [
       {
         protocol: "https",

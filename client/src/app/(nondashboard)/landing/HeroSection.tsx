@@ -22,6 +22,14 @@ const HeroSection = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Prefetch search routes
+  useEffect(() => {
+    router.prefetch('/search');
+    ["Apartment", "House", "Villa", "Studio"].forEach(type => {
+      router.prefetch(`/search?propertyType=${type}`);
+    });
+  }, [router]);
+
   const handleSearch = async (value: string) => {
     setSearchTerm(value);
     if (value.length > 2) {
@@ -33,7 +41,7 @@ const HeroSection = () => {
           )}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
           }&fuzzyMatch=true`
         );
-        const data = await response.json();
+        const data = await response?.json();
         if (data.features) {
           setSuggestions(data.features);
         }
@@ -74,6 +82,16 @@ const HeroSection = () => {
     }
   };
 
+  const handlePropertyTypeClick = (type: string) => {
+    setIsLoading(true); // Add loading state
+    dispatch(
+      setFilters({
+        propertyType: type,
+      })
+    );
+    router.push(`/search?propertyType=${type}`);
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
       {/* Subtle background elements */}
@@ -107,14 +125,14 @@ const HeroSection = () => {
 
       {/* Content */}
       <div className="container mx-auto px-4 md:px-8 relative z-10 pt-16">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto text-center lg:mt-0 mt-10">
           <h1
             className={`text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 transition-all duration-700 ${isVisible
               ? "opacity-100 transform translate-y-0"
               : "opacity-0 transform translate-y-10"
               }`}
           >
-            Find Your <span className="text-blue-600">Perfect</span> Home
+            Find Your Space You Were Meant to <span className="text-[#004B93]">Dwell <span className="text-[#c9002b]">In.</span></span>
           </h1>
           <p
             className={`text-xl text-gray-600 mb-12 max-w-2xl mx-auto transition-all duration-700 delay-100 ${isVisible
@@ -128,7 +146,7 @@ const HeroSection = () => {
 
           {/* Search Bar */}
           <div
-            className={`bg-white rounded-2xl shadow-xl border border-gray-200 p-2 transition-all duration-700 delay-200 ${isVisible
+            className={`bg-white rounded-2xl shadow-xl border border-gray-200 p-2 transition-all duration-700 delay-200 relative ${isVisible
               ? "opacity-100 transform translate-y-0"
               : "opacity-0 transform translate-y-10"
               }`}
@@ -148,18 +166,18 @@ const HeroSection = () => {
                 />
                 {isLoading && (
                   <div className="absolute right-3 top-4">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#004B93]"></div>
                   </div>
                 )}
                 {suggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-20 overflow-hidden">
+                  <div className="absolute left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-y-scroll max-h-40">
                     {suggestions.map((suggestion, index) => (
                       <div
                         key={index}
                         className="px-4 py-3 hover:bg-gray-50 cursor-pointer flex items-center border-b border-gray-100 last:border-0"
                         onClick={() => handleLocationSelect(suggestion)}
                       >
-                        <MapPin className="h-4 w-4 text-blue-600 mr-3" />
+                        <MapPin className="h-4 w-4 text-[#004B93] mr-3" />
                         <span className="text-gray-700">{suggestion.place_name}</span>
                       </div>
                     ))}
@@ -168,7 +186,7 @@ const HeroSection = () => {
               </div>
               <Button
                 onClick={handleSearchSubmit}
-                className="mt-2 md:mt-0 bg-blue-600 hover:bg-blue-700 rounded-xl text-white py-4 px-8 flex items-center justify-center gap-2 h-full font-medium"
+                className="mt-2 md:mt-0 bg-[#004B93] hover:bg-[#004B93] rounded-xl text-white py-4 px-8 flex items-center justify-center gap-2 h-full font-medium"
               >
                 <Search className="h-5 w-5" />
                 <span>Search Properties</span>
@@ -177,41 +195,20 @@ const HeroSection = () => {
           </div>
 
           {/* Quick filters */}
-          <div
-            className={`mt-8 flex flex-wrap justify-center gap-3 transition-all duration-700 delay-300 ${isVisible
-              ? "opacity-100 transform translate-y-0"
-              : "opacity-0 transform translate-y-10"
-              }`}
-          >
-            {["Apartments", "Houses", "Villas", "Studio"].map((type) => (
+          <div className={`mt-8 flex flex-wrap justify-center gap-3 ${isVisible ? "opacity-100" : "opacity-0"}`}>
+            {["Apartment", "Rooms", "Villa", "Studio"].map((type) => (
               <button
                 key={type}
-                className="px-4 py-2 bg-gray-100 hover:bg-blue-50 hover:text-blue-700 text-gray-700 rounded-full text-sm font-medium transition-colors border border-transparent hover:border-blue-200"
+                disabled={isLoading}
+                onClick={() => handlePropertyTypeClick(type)}
+                className={`px-4 py-2 bg-gray-100 hover:bg-blue-50 hover:text-[#004B93] 
+                  text-gray-700 rounded-full text-sm font-medium transition-colors 
+                  border border-transparent hover:border-blue-200
+                  disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {type}
               </button>
             ))}
-          </div>
-
-          {/* Stats */}
-          <div
-            className={`mt-12 grid grid-cols-3 gap-8 max-w-md mx-auto transition-all duration-700 delay-400 ${isVisible
-              ? "opacity-100 transform translate-y-0"
-              : "opacity-0 transform translate-y-10"
-              }`}
-          >
-            <div>
-              <div className="text-2xl font-bold text-gray-900">10K+</div>
-              <div className="text-sm text-gray-600">Properties</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">50+</div>
-              <div className="text-sm text-gray-600">Cities</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">99%</div>
-              <div className="text-sm text-gray-600">Satisfaction</div>
-            </div>
           </div>
         </div>
       </div>

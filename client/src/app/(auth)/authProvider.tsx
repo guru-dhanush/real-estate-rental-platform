@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Amplify } from "aws-amplify";
 import {
   Authenticator,
@@ -23,7 +23,6 @@ Amplify.configure({
     },
   },
 });
-
 const components = {
   SignIn: {
     Footer() {
@@ -34,7 +33,7 @@ const components = {
             Don&apos;t have an account?{" "}
             <button
               onClick={toSignUp}
-              className="text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-none p-0 font-medium transition-colors"
+              className="text-[#004B93] hover:text-[#004B93] hover:underline bg-transparent border-none p-0 font-medium transition-colors"
             >
               Sign up here
             </button>
@@ -72,7 +71,7 @@ const components = {
             Already have an account?{" "}
             <button
               onClick={toSignIn}
-              className="text-blue-600 hover:text-blue-700 hover:underline bg-transparent border-none p-0 font-medium transition-colors"
+              className="text-[#004B93] hover:text-[#004B93] hover:underline bg-transparent border-none p-0 font-medium transition-colors"
             >
               Sign in
             </button>
@@ -144,60 +143,27 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
   if (!isAuthPage && !isDashboardPage) {
     return <>{children}</>;
   }
-
   return (
     <div className="min-h-screen bg-white relative overflow-hidden">
-      {/* Background elements matching HeroSection */}
-      <div className="absolute inset-0">
-        {/* Grid pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern
-                id="auth-grid"
-                width="40"
-                height="40"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M 40 0 L 0 0 0 40"
-                  fill="none"
-                  stroke="rgb(37, 99, 235)"
-                  strokeWidth="1"
-                />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#auth-grid)" />
-          </svg>
-        </div>
 
-        {/* Subtle gradient circles */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-30"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-20"></div>
-      </div>
 
       {/* Auth container */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full">
-          <Authenticator
-            initialState={pathname.includes("signup") ? "signUp" : "signIn"}
-            components={components}
-            formFields={formFields}
-            className="auth-container"
-          >
-            {() => <>{children}</>}
-          </Authenticator>
-        </div>
-      </div>
-
+      <Authenticator
+        initialState={pathname.includes("signup") ? "signUp" : "signIn"}
+        components={components}
+        formFields={formFields}
+        className="auth-container"
+      >
+        {() => <>{children}</>}
+      </Authenticator>
       <style jsx global>{`
         /* Custom styles to match HeroSection design */
         .auth-container .amplify-authenticator {
           --amplify-colors-background-primary: transparent;
           --amplify-colors-background-secondary: white;
           --amplify-colors-border-primary: rgb(229, 231, 235);
-          --amplify-colors-border-focus: rgb(37, 99, 235);
-          --amplify-colors-brand-primary-80: rgb(37, 99, 235);
+          --amplify-colors-border-focus: #004B93;
+          --amplify-colors-brand-primary-80: #004B93;
           --amplify-colors-brand-primary-90: rgb(29, 78, 216);
           --amplify-colors-brand-primary-100: rgb(30, 64, 175);
           --amplify-radii-medium: 0.75rem;
@@ -228,13 +194,13 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
 
         .auth-container .amplify-input:focus,
         .auth-container .amplify-select:focus {
-          border-color: rgb(37, 99, 235);
+          border-color:[#004B93];
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
           outline: none;
         }
 
         .auth-container .amplify-button--primary {
-          background-color: rgb(37, 99, 235);
+          background-color: #004B93;
           border-radius: 1rem;
           padding: 1rem 2rem;
           font-weight: 500;
@@ -246,12 +212,12 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
         }
 
         .auth-container .amplify-button--primary:hover {
-          background-color: rgb(29, 78, 216);
+          background-color: [#004B93];
           transform: translateY(-1px);
         }
 
         .auth-container .amplify-button--link {
-          color: rgb(37, 99, 235);
+          color: #004B93;
           font-weight: 500;
         }
 
@@ -279,8 +245,8 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
         }
 
         .auth-container .amplify-radio__button:checked {
-          background-color: rgb(37, 99, 235);
-          border-color: rgb(37, 99, 235);
+          background-color: #004B93;
+          border-color: #004B93;
         }
 
         .auth-container .amplify-fieldset {
@@ -309,7 +275,7 @@ const Auth = ({ children }: { children: React.ReactNode }) => {
 
         /* Loading states */
         .auth-container .amplify-loader {
-          border-color: rgb(37, 99, 235);
+          border-color: #004B93;
         }
 
         /* Responsive design */

@@ -3,16 +3,17 @@ import React, { ReactNode } from "react";
 interface ButtonProps {
   children: ReactNode;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
-  variant?: 
-    | "primary" 
-    | "secondary" 
-    | "outline" 
-    | "ghost" 
-    | "destructive" 
-    | "success" 
-    | "warning" 
-    | "gradient" 
-    | "glass";
+  variant?:
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "ghost"
+  | "destructive"
+  | "success"
+  | "warning"
+  | "gradient"
+  | "glass"
+  | "none";
   startIcon?: ReactNode;
   endIcon?: ReactNode;
   onClick?: () => void;
@@ -58,8 +59,9 @@ const Button: React.FC<ButtonProps> = ({
 
   // Variant Classes
   const variantClasses = {
+    none: "", // Empty string for no default styling
     primary:
-      "bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:bg-blue-800 disabled:bg-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600",
+      "bg-[#004B93] text-white shadow-sm hover:bg-[#004B93] focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 active:bg-[#004B93] disabled:bg-blue-300 dark:bg-blue-500 dark:hover:bg-[#004B93]",
     secondary:
       "bg-gray-600 text-white shadow-sm hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 active:bg-gray-800 disabled:bg-gray-300 dark:bg-gray-500 dark:hover:bg-gray-600",
     outline:

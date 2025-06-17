@@ -50,12 +50,15 @@ const Map = () => {
     });
 
     const resizeMap = () => {
-      if (map)
+      if (map) {
         setTimeout(() => {
           const center = map.getCenter();
-          google.maps.event.trigger(map, "resize");
-          map.setCenter(center);
+          if (center) {
+            google.maps.event.trigger(map, "resize");
+            map.setCenter(center);
+          }
         }, 700);
+      }
     };
     resizeMap();
 

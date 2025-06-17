@@ -89,7 +89,7 @@ export const getManagerProperties = async (
     });
 
     const propertiesWithFormattedLocation = await Promise.all(
-      properties.map(async (property) => {
+      properties.map(async (property: any) => {
         const coordinates: { coordinates: string }[] =
           await prisma.$queryRaw`SELECT ST_asText(coordinates) as coordinates from "Location" where id = ${property.location.id}`;
 

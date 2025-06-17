@@ -7,7 +7,7 @@ import { useGetAuthUserQuery, useGetManagerPropertiesQuery, useDeletePropertyMut
 import React from "react";
 import Button from "@/components/ui/button/Button";
 import { useRouter } from "next/navigation";
-import { Trash2, Edit } from "lucide-react";
+import { Trash2, Edit, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 const Properties = () => {
@@ -36,7 +36,21 @@ const Properties = () => {
   if (error) return <div>Error loading manager properties</div>;
 
   return (
-    <ComponentCard title="My Properties" desc="View and manage your property listings" className="dashboard-container">
+    <ComponentCard
+      title="My Properties"
+      desc="View and manage your property listings"
+      className="dashboard-container"
+      actionButton={
+        <Button
+          variant="outline"
+          onClick={() => router.push("/managers/newproperty")}
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-5 h-5" />
+          <span className="hidden sm:inline">Create Property</span>
+        </Button>
+      }
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {managerProperties?.map((property) => (
           <div key={property.id} className="relative group">

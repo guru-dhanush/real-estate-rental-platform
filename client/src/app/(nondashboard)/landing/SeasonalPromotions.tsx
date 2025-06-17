@@ -46,7 +46,7 @@
 //       icon: <Snowflake className="h-8 w-8" />,
 //       color: "from-blue-500 to-indigo-600",
 //       bgClass: "bg-gradient-to-r from-blue-50 to-indigo-50",
-//       textClass: "text-blue-600",
+//       textClass: "text-[#004B93]",
 //       image:
 //         "https://images.unsplash.com/photo-1418985991508-e47386d96a71?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80",
 //     },

@@ -128,7 +128,54 @@ const FiltersBar = () => {
   return (
     <div className="w-full bg-white border-b border-gray-100">
       <div className="container mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between py-4 gap-2 sm:gap-4 lg:gap-6">
+        {/* Mobile Search Bar */}
+        <div className="block lg:hidden w-full py-3">
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MapPin className="h-4 w-4 text-gray-500" />
+            </div>
+            <Input
+              placeholder="Search location..."
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onKeyDown={handleKeyDown}
+              className="w-full pl-8 pr-8 h-10 !rounded-full border-gray-200 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent shadow-sm text-sm"
+            />
+            {isLoading && (
+              <div className="absolute right-3 top-2.5">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-500 border-t-transparent"></div>
+              </div>
+            )}
+            <Button
+              onClick={handleSearchSubmit}
+              size="xs"
+              className="absolute right-2 top-1.5 h-8 w-8 p-0 !rounded-full bg-primary-600 hover:bg-primary-700 shadow-md"
+            >
+              <Search className="h-4 w-4 text-white" />
+            </Button>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1 bg-white !rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto border border-gray-200">
+                {suggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center border-b border-gray-100 last:border-0"
+                    onMouseDown={() => handleLocationSelect(suggestion)}
+                  >
+                    <MapPin className="h-5 w-4 text-primary-600 mr-3" />
+                    <span className="text-sm">{suggestion.place_name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between py-2 gap-2">
           {/* Left side - View Controls */}
           <div className="flex items-center gap-1 sm:gap-3">
             {/* View Mode Toggle */}
@@ -160,8 +207,8 @@ const FiltersBar = () => {
             </div>
           </div>
 
-          {/* Center - Search Bar */}
-          <div className="flex-1 max-w-xs sm:max-w-md mx-2 sm:mx-4 lg:mx-8 relative">
+          {/* Desktop Search Bar */}
+          <div className="hidden lg:block flex-1 max-w-md mx-2 sm:mx-4 lg:mx-8 relative">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <MapPin className="h-4 w-4 text-gray-500" />
@@ -216,7 +263,7 @@ const FiltersBar = () => {
               className={cn(
                 "gap-1 sm:gap-2 h-9 px-2 sm:px-4 rounded-lg text-xs font-medium shadow-sm transition-all",
                 mapViewEnabled
-                  ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                  ? "bg-[#004B93] hover:bg-[#004B93] text-white border-[#004B93]"
                   : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
               )}
               onClick={() => dispatch(toggleMapView())}
@@ -229,7 +276,7 @@ const FiltersBar = () => {
               className={cn(
                 "gap-1 sm:gap-2 h-9 px-2 sm:px-4 rounded-lg text-xs font-medium shadow-sm transition-all",
                 isFiltersFullOpen
-                  ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                  ? "bg-[#004B93] hover:bg-[#004B93] text-white border-[#004B93]"
                   : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
               )}
               onClick={() => dispatch(toggleFiltersFullOpen())}

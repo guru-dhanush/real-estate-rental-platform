@@ -58,7 +58,7 @@ const CardCompact = ({
               {propertyLink ? (
                 <Link
                   href={propertyLink}
-                  className="hover:text-blue-600 transition-colors duration-200"
+                  className="hover:text-[#004B93] transition-colors duration-200"
                   scroll={false}
                 >
                   {property.name}
@@ -76,9 +76,8 @@ const CardCompact = ({
                 }
               >
                 <Heart
-                  className={`w-4 h-4 ${
-                    isFavorite ? "text-red-500 fill-red-500" : "text-gray-600"
-                  }`}
+                  className={`w-4 h-4 ${isFavorite ? "text-red-500 fill-red-500" : "text-gray-600"
+                    }`}
                 />
               </button>
             )}

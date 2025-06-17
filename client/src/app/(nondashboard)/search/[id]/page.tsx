@@ -11,6 +11,7 @@ import PropertyOverview from "./PropertyOverview";
 import PropertyDetails from "./PropertyDetails";
 import PropertyLocation from "./PropertyLocation";
 import ContactWidget from "./ContactWidget";
+import Loading from "@/components/Loading";
 
 const SingleListing = () => {
   const { id } = useParams();
@@ -22,7 +23,7 @@ const SingleListing = () => {
   } = useGetPropertyQuery(propertyId);
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <Loading />
   }
 
   return (

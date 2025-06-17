@@ -70,7 +70,7 @@ const ChatPage = () => {
       <div className="animate-pulse flex space-x-2">
         <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
         <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-        <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+        <div className="w-3 h-3 bg-[#004B93] rounded-full"></div>
       </div>
     </div>
   );
@@ -78,7 +78,7 @@ const ChatPage = () => {
   if (isError) return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
       <div className="text-red-500 mb-4 text-lg font-medium">Unable to load chat</div>
-      <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-sm">
+      <Button className="bg-[#004B93] hover:bg-[#004B93] text-white px-6 py-2 rounded-lg shadow-sm">
         Retry
       </Button>
     </div>
@@ -87,7 +87,7 @@ const ChatPage = () => {
   if (!chat) return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-50">
       <div className="text-gray-600 mb-4 text-lg font-medium">Chat not found</div>
-      <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-sm">
+      <Button className="bg-[#004B93] hover:bg-[#004B93] text-white px-6 py-2 rounded-lg shadow-sm">
         Return to Inbox
       </Button>
     </div>
@@ -128,7 +128,7 @@ const ChatPage = () => {
             {/* Manager Avatar with Online Status */}
             <div className="relative">
               {chat.manager?.email ? (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-[#004B93] flex items-center justify-center text-white shadow-sm">
                   <span className="font-medium text-lg">
                     {chat.manager.name.charAt(0).toUpperCase()}
                   </span>
@@ -158,8 +158,8 @@ const ChatPage = () => {
               <div className="text-xs text-gray-500 truncate">
                 {chat.property?.location?.address || 'No address provided'}
               </div>
-              <div className={`text-blue-600 text-sm ${showSidebar ? 'hidden' : 'flex'} `}>
-                <p className={`text-blue-600 text-sm ${showSidebar ? 'hidden' : 'flex'} `}>
+              <div className={`text-[#004B93] text-sm ${showSidebar ? 'hidden' : 'flex'} `}>
+                <p className={`text-[#004B93] text-sm ${showSidebar ? 'hidden' : 'flex'} `}>
                   ${chat.property?.pricePerMonth?.toLocaleString()}/mo
                 </p>
               </div>
@@ -211,7 +211,7 @@ const ChatPage = () => {
                             className="rounded-full object-cover border border-gray-200 shadow-sm"
                           />
                         ) : (
-                          <div className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm">
+                          <div className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-[#004B93] text-white shadow-sm">
                             <User size={18} />
                           </div>
                         )}
@@ -220,7 +220,7 @@ const ChatPage = () => {
 
                     <div
                       className={`max-w-xs md:max-w-md lg:max-w-lg rounded-2xl px-4 py-2 shadow-sm ${isCurrentUser
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-br-none"
+                        ? "bg-gradient-to-r from-[#004B93] to-[#004B93] text-white rounded-br-none"
                         : "bg-white border border-gray-200 rounded-bl-none"
                         }`}
                     >
@@ -262,7 +262,7 @@ const ChatPage = () => {
                 onClick={handleSendMessage}
                 disabled={!message.trim()}
                 className={`rounded-full h-10 w-10 flex items-center justify-center ml-1 transition-all ${message.trim()
-                  ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                  ? "bg-[#004B93] hover:bg-[#004B93] text-white shadow-md"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
                 aria-label="Send message"
@@ -284,7 +284,7 @@ const ChatPage = () => {
               setIsScrolledToBottom(true);
               messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="fixed bottom-20 right-6 bg-white shadow-md rounded-full p-2 text-blue-600 hover:bg-blue-50 transition-all border border-gray-200 z-10"
+            className="fixed bottom-20 right-6 bg-white shadow-md rounded-full p-2 text-[#004B93] hover:bg-blue-50 transition-all border border-gray-200 z-10"
             aria-label="Scroll to bottom"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -1,4 +1,5 @@
 "use client";
+import { Dweltin } from "@/components/Dweltin";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
 import Link from "next/link";
@@ -89,18 +90,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ authUser }) => {
             {/* Cross Icon */}
           </button>
 
-          <Link href="/" className="lg:hidden">
-            <img
-              className="dark:hidden h-[20px]"
-              src="./images/logo/logo.png"
-              alt="Logo"
-            />
-            <img
-              className="hidden dark:block h-[20px]"
-              src="./images/logo/logo.png"
-              alt="Logo"
-            />
-          </Link>
+          <Dweltin className="lg:hidden" />
 
           <button
             onClick={toggleApplicationMenu}
