@@ -5,7 +5,7 @@ import Loading from "@/components/Loading";
 import { NAVBAR_HEIGHT } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/state/redux";
 import { useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import FiltersBar from "./FiltersBar";
 import FiltersFull from "./FiltersFull";
 import { cleanParams } from "@/lib/utils";
@@ -173,4 +173,14 @@ const SearchPage = () => {
   );
 };
 
-export default SearchPage;
+
+
+const Page = () => {
+  return (
+    <Suspense fallback={<Loading />}>
+      <SearchPage />
+    </Suspense>
+  )
+}
+
+export default Page

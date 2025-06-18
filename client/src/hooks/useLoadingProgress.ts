@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export const useLoadingProgress = () => {
     const [progress, setProgress] = useState(0);
     const [isRouteChanging, setIsRouteChanging] = useState(false);
     const pathname = usePathname();
-    const searchParams = useSearchParams();
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -38,7 +37,7 @@ export const useLoadingProgress = () => {
             clearInterval(timer);
             completeLoading();
         };
-    }, [pathname, searchParams]);
+    }, [pathname]);
 
     return { progress, isRouteChanging };
 };
