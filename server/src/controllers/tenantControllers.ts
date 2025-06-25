@@ -19,18 +19,18 @@ export const getTenant = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    console.log(
-      `[getTenant] Query result:`,
-      tenant ? `Tenant found: ${tenant.name}` : "Tenant not found"
-    );
-
     if (tenant) {
+      console.log(`[getTenant] Tenant found: ${tenant.name}`);
       res.json(tenant);
     } else {
+      console.log(`[getTenant] Tenant not found for cognitoId: ${cognitoId}`);
       res.status(404).json({ message: "Tenant not found" });
     }
   } catch (error: any) {
-    console.error(`[getTenant] Error:`, error);
+    console.error(
+      `[getTenant] Error fetching tenant for cognitoId ${req.params.cognitoId}:`,
+      error
+    );
     res
       .status(500)
       .json({ message: `Error retrieving tenant: ${error.message}` });

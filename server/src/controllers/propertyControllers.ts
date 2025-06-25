@@ -299,47 +299,85 @@ export const createProperty = async (
       managerCognitoId,
     });
 
-    console.log(`[createProperty] Uploading ${files.length} photos to S3...`);
-    const photoUrls = await Promise.all(
-      files.map(async (file, index) => {
+    // Initialize photoUrls array
+    let photoUrls: string[] = [];
+
+    // Handle photo uploads if files are provided
+    if (files && files.length > 0) {
+      console.log(`[createProperty] Uploading ${files.length} photos to S3...`);
+
+      // Use for...of loop instead of Promise.all for better error handling
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
         console.log(
-          `[createProperty] Uploading file ${index + 1}/${files.length}: ${file.originalname
-          } (${file.size} bytes)`
+          `[createProperty] Uploading file ${index + 1}/${files.length}: ${file.originalname} (${file.size} bytes)`
         );
-        const uploadParams = {
-          Bucket: process.env.S3_BUCKET_NAME!,
-          Key: `properties/${Date.now()}-${file.originalname}`,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        };
 
         try {
+          // Validate file before upload
+          if (!file.buffer || file.buffer.length === 0) {
+            console.error(`[createProperty] File ${index + 1} has no buffer or empty buffer`);
+            throw new Error(`File ${file.originalname} is empty or corrupted`);
+          }
+
+          const uploadParams = {
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+          };
+
           const uploadResult = await new Upload({
             client: s3Client,
             params: uploadParams,
           }).done();
 
-          console.log(
-            `[createProperty] File ${index + 1} uploaded successfully to ${uploadResult.Location
-            }`
-          );
-          return uploadResult.Location;
+          if (uploadResult.Location) {
+            photoUrls.push(uploadResult.Location);
+            console.log(
+              `[createProperty] File ${index + 1} uploaded successfully to ${uploadResult.Location}`
+            );
+          } else {
+            console.error(`[createProperty] Upload result for file ${index + 1} has no Location`);
+            throw new Error(`Failed to get upload location for ${file.originalname}`);
+          }
         } catch (uploadError: any) {
           console.error(
             `[createProperty] Error uploading file ${index + 1}:`,
             uploadError
           );
+
+          // Clean up any successfully uploaded files before throwing error
+          if (photoUrls.length > 0) {
+            console.log(`[createProperty] Cleaning up ${photoUrls.length} uploaded files due to error`);
+            for (const url of photoUrls) {
+              try {
+                const key = url.split("/").slice(-1)[0]; // Get filename from URL
+                await s3Client.send(
+                  new DeleteObjectCommand({
+                    Bucket: process.env.S3_BUCKET_NAME!,
+                    Key: `properties/${key}`,
+                  })
+                );
+              } catch (deleteError) {
+                console.error(`[createProperty] Error cleaning up file ${url}:`, deleteError);
+              }
+            }
+          }
+
           throw new Error(
             `Failed to upload image ${file.originalname}: ${uploadError.message}`
           );
         }
-      })
-    );
+      }
 
-    console.log(
-      `[createProperty] All photos uploaded successfully:`,
-      photoUrls
-    );
+      console.log(
+        `[createProperty] All photos uploaded successfully:`,
+        photoUrls
+      );
+    } else {
+      console.log(`[createProperty] No files to upload`);
+    }
 
     console.log(`[createProperty] Geocoding address...`);
     const geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
@@ -354,7 +392,7 @@ export const createProperty = async (
 
     const geocodingResponse = await axios.get(geocodingUrl, {
       headers: {
-        "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com",
+        "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com)",
       },
     });
 
@@ -378,13 +416,13 @@ export const createProperty = async (
 
     console.log(`[createProperty] Final coordinates:`, { longitude, latitude });
 
-    // create location
+    // Create location with parameterized query to prevent SQL injection
     console.log(`[createProperty] Creating location record...`);
-    const locationResult = await prisma.$queryRawUnsafe(`
+    const locationResult = await prisma.$queryRaw<LocationResult[]>`
       INSERT INTO "Location" (address, city, state, country, "postalCode", coordinates)
-      VALUES ('${address}', '${city}', '${state}', '${country}', '${postalCode}', ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
+      VALUES (${address}, ${city}, ${state}, ${country}, ${postalCode}, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326))
       RETURNING id, address, city, state, country, "postalCode", ST_AsText(coordinates) as coordinates;
-    `);
+    `;
     const location = Array.isArray(locationResult) ? locationResult[0] : locationResult;
 
     console.log(`[createProperty] Location created:`, {
@@ -398,35 +436,35 @@ export const createProperty = async (
     );
     const amenitiesArray =
       typeof propertyData.amenities === "string"
-        ? propertyData.amenities.split(",")
+        ? propertyData.amenities.split(",").filter(Boolean)
         : [];
 
     const highlightsArray =
       typeof propertyData.highlights === "string"
-        ? propertyData.highlights.split(",")
+        ? propertyData.highlights.split(",").filter(Boolean)
         : [];
 
     console.log(`[createProperty] Processed amenities:`, amenitiesArray);
     console.log(`[createProperty] Processed highlights:`, highlightsArray);
 
-    // create property
+    // Create property
     console.log(`[createProperty] Creating property record...`);
     const newProperty = await prisma.property.create({
       data: {
         ...propertyData,
-        photoUrls,
+        photoUrls, // This should now be a properly typed string array
         locationId: location.id,
         managerCognitoId,
         amenities: amenitiesArray,
         highlights: highlightsArray,
         isPetsAllowed: propertyData.isPetsAllowed === "true",
         isParkingIncluded: propertyData.isParkingIncluded === "true",
-        pricePerMonth: parseFloat(propertyData.pricePerMonth),
-        securityDeposit: parseFloat(propertyData.securityDeposit),
-        applicationFee: parseFloat(propertyData.applicationFee),
-        beds: parseInt(propertyData.beds),
-        baths: parseFloat(propertyData.baths),
-        squareFeet: parseInt(propertyData.squareFeet),
+        pricePerMonth: parseFloat(propertyData.pricePerMonth) || 0,
+        securityDeposit: parseFloat(propertyData.securityDeposit) || 0,
+        applicationFee: parseFloat(propertyData.applicationFee) || 0,
+        beds: parseInt(propertyData.beds) || 0,
+        baths: parseFloat(propertyData.baths) || 0,
+        squareFeet: parseInt(propertyData.squareFeet) || 0,
       },
       include: {
         location: true,

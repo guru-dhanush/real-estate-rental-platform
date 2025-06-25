@@ -8,18 +8,23 @@ export const getManager = async (
   req: Request,
   res: Response
 ): Promise<void> => {
+  console.log(`[getManager] Function called with params:`, req.params);
   try {
     const { cognitoId } = req.params;
+    console.log(`[getManager] Searching for manager with cognitoId: ${cognitoId}`);
     const manager = await prisma.manager.findUnique({
       where: { cognitoId },
     });
 
     if (manager) {
+      console.log(`[getManager] Manager found: ${manager.name}`);
       res.json(manager);
     } else {
+      console.log(`[getManager] Manager not found for cognitoId: ${cognitoId}`);
       res.status(404).json({ message: "Manager not found" });
     }
   } catch (error: any) {
+    console.error(`[getManager] Error fetching manager for cognitoId ${req.params.cognitoId}:`, error);
     res
       .status(500)
       .json({ message: `Error retrieving manager: ${error.message}` });
