@@ -20,6 +20,39 @@ interface LocationResult {
   postalCode: string;
 }
 
+export const testS3Connection = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('Testing S3 connection...');
+    console.log('AWS_REGION:', process.env.AWS_REGION);
+    console.log('S3_BUCKET_NAME:', process.env.S3_BUCKET_NAME);
+
+    // Test if we can list bucket contents
+    const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
+    const listCommand = new ListObjectsV2Command({
+      Bucket: process.env.S3_BUCKET_NAME!,
+      Prefix: 'properties/',
+      MaxKeys: 5
+    });
+
+    const listResult = await s3Client.send(listCommand);
+    console.log('S3 List Result:', listResult);
+
+    res.json({
+      message: 'S3 connection successful',
+      region: process.env.AWS_REGION,
+      bucket: process.env.S3_BUCKET_NAME,
+    });
+  } catch (error: any) {
+    console.error('S3 connection error:', error);
+    res.status(500).json({
+      message: 'S3 connection failed',
+      error: error.message,
+      code: error.code
+    });
+  }
+};
+
+
 export const getProperties = async (
   req: Request,
   res: Response
