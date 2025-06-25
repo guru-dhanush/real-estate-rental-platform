@@ -35,7 +35,6 @@ router.put(
   updateProperty
 );
 
-router.get('/test-s3', testS3Connection);
 
 router.delete("/:id", authMiddleware(["manager"]), deleteProperty);
 export default router;
