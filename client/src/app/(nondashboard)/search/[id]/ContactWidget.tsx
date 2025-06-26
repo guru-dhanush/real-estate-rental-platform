@@ -49,7 +49,7 @@ const ContactWidget = ({
   } = useGetMangerQuery(managerCognitoId);
 
   return (
-    <div className="bg-white shadow-md rounded-2xl overflow-hidden sticky top-6 w-[300px]">
+    <div className="bg-white shadow-md rounded-2xl overflow-hidden sticky top-6">
       {/* Manager Profile Section */}
       <div className="bg-primary-50 p-5 border-b border-primary-100 flex items-center gap-4">
         {manager?.avatarUrl ? (

@@ -142,7 +142,7 @@ const SearchPage = () => {
       }}
     >
       <FiltersBar />
-      <div className="flex flex-1 overflow-hidden gap-4 pb-4 mt-4">
+      <div className="flex flex-1 overflow-hidden  pb-4 mt-4">
         {/* Main content area */}
         <div className="flex-1 flex overflow-hidden">
           {mapViewEnabled ? (

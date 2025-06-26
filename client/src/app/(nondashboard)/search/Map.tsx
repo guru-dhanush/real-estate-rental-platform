@@ -33,6 +33,8 @@ const Map = () => {
           stylers: [{ visibility: "off" }],
         },
       ],
+      mapTypeControl: false, // Remove Map/Satellite option
+      streetViewControl: false, // Remove Street View
     });
     mapRef.current = map;
 

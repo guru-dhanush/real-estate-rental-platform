@@ -77,7 +77,7 @@ const PropertyOverview = ({ propertyId }: PropertyOverviewProps) => {
 
         {/* Property Stats */}
         <div className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Monthly Rent */}
             <div className="flex items-center gap-4">
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
