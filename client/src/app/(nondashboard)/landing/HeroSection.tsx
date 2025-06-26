@@ -118,6 +118,16 @@ const HeroSection = () => {
           </svg>
         </div>
 
+        {/* Hero background images at left and right, right side reversed */}
+        <div className="absolute left-0 right-0 bottom-0 w-full h-full z-0 pointer-events-none select-none">
+          {/* Left image */}
+          <img
+            src="/images/herosection/herosection_bg.png"
+            alt="Hero background left"
+            className="absolute bottom-0 left-[-10px] h-[25vh] md:h-[60vh] lg:h-[80vh] w-auto object-cover opacity-90 "
+          />
+        </div>
+
         {/* Subtle gradient circles */}
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-30"></div>
         <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-20"></div>

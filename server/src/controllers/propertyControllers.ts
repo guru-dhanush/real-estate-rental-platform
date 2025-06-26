@@ -413,39 +413,111 @@ export const createProperty = async (
     }
 
     console.log(`[createProperty] Geocoding address...`);
-    const geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
-      {
-        postalcode: postalCode,
-        format: "json",
-        limit: "1",
-      }
-    ).toString()}`;
 
-    console.log(`[createProperty] Geocoding URL:`, geocodingUrl);
+    // Try full address first for more accurate coordinates
+    const fullAddress = `${address}, ${city}, ${state}, ${country}`;
+    let geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+      q: fullAddress,
+      format: "json",
+      limit: "1",
+    }).toString()}`;
 
-    const geocodingResponse = await axios.get(geocodingUrl, {
+    console.log(`[createProperty] Geocoding URL (full address):`, geocodingUrl);
+
+    let geocodingResponse = await axios.get(geocodingUrl, {
       headers: {
         "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com)",
       },
     });
 
+    // Fallback to structured address if full address doesn't return results
+    if (!geocodingResponse.data || geocodingResponse.data.length === 0) {
+      console.log(`[createProperty] Full address geocoding failed, trying structured address...`);
+
+      geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+        street: address,
+        city: city,
+        state: state,
+        country: country,
+        postalcode: postalCode,
+        format: "json",
+        limit: "1",
+      }).toString()}`;
+
+      console.log(`[createProperty] Geocoding URL (structured):`, geocodingUrl);
+
+      geocodingResponse = await axios.get(geocodingUrl, {
+        headers: {
+          "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com)",
+        },
+      });
+    }
+
+    // Final fallback to postal code only if structured address fails
+    if (!geocodingResponse.data || geocodingResponse.data.length === 0) {
+      console.log(`[createProperty] Structured address geocoding failed, trying postal code only...`);
+
+      geocodingUrl = `https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+        postalcode: postalCode,
+        city: city,
+        state: state,
+        country: country,
+        format: "json",
+        limit: "1",
+      }).toString()}`;
+
+      console.log(`[createProperty] Geocoding URL (postal code):`, geocodingUrl);
+
+      geocodingResponse = await axios.get(geocodingUrl, {
+        headers: {
+          "User-Agent": "RealEstateApp (justsomedummyemail@gmail.com)",
+        },
+      });
+    }
+
     console.log(
       `[createProperty] Geocoding response:`,
       geocodingResponse.data && geocodingResponse.data.length > 0
         ? {
+          display_name: geocodingResponse.data[0]?.display_name,
           lon: geocodingResponse.data[0]?.lon,
           lat: geocodingResponse.data[0]?.lat,
         }
         : "No geocoding results found"
     );
 
-    const [longitude, latitude] =
+    let [longitude, latitude] =
       geocodingResponse.data[0]?.lon && geocodingResponse.data[0]?.lat
         ? [
           parseFloat(geocodingResponse.data[0]?.lon),
           parseFloat(geocodingResponse.data[0]?.lat),
         ]
         : [0, 0];
+
+    // Check if coordinates already exist and add small offset if needed
+    if (longitude !== 0 && latitude !== 0) {
+      try {
+        const existingCoords = await prisma.$queryRaw<[{ count: number }]>`
+          SELECT COUNT(*)::integer as count FROM "Location" 
+          WHERE ABS(ST_X(coordinates::geometry) - ${longitude}) < 0.0001 
+          AND ABS(ST_Y(coordinates::geometry) - ${latitude}) < 0.0001
+        `;
+
+        if (existingCoords[0]?.count > 0) {
+          console.log(`[createProperty] Similar coordinates already exist, adding small offset`);
+          // Add small random offset (±0.001 degrees ≈ ±100 meters)
+          longitude += (Math.random() - 0.5) * 0.002;
+          latitude += (Math.random() - 0.5) * 0.002;
+          console.log(`[createProperty] Applied offset - new coordinates:`, { longitude, latitude });
+        }
+      } catch (coordCheckError) {
+        console.warn(`[createProperty] Could not check existing coordinates:`, coordCheckError);
+        // Continue with original coordinates if check fails
+      }
+    }
+
+    // Add rate limiting delay to respect Nominatim usage policy
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     console.log(`[createProperty] Final coordinates:`, { longitude, latitude });
 
@@ -517,6 +589,7 @@ export const createProperty = async (
       .json({ message: `Error creating property: ${err.message}` });
   }
 };
+
 export const updateProperty = async (
   req: Request,
   res: Response

@@ -63,7 +63,7 @@ const PropertyOverview = ({ propertyId }: PropertyOverviewProps) => {
               </span>
             </div>
 
-            <div className="flex items-center">
+            {/* <div className="flex items-center">
               <Star className="w-4 h-4 mr-1 text-amber-500" />
               <span className="font-medium text-gray-800">
                 {property.averageRating?.toFixed(1)}
@@ -71,7 +71,7 @@ const PropertyOverview = ({ propertyId }: PropertyOverviewProps) => {
               <span className="text-sm text-gray-600 ml-1">
                 ({property.numberOfReviews} reviews)
               </span>
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -85,40 +85,66 @@ const PropertyOverview = ({ propertyId }: PropertyOverviewProps) => {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Monthly Rent</p>
-                <p className="text-lg font-medium text-primary-900">
+                <p className="text-sm font-medium text-primary-900">
                   ${property.pricePerMonth.toLocaleString()}
                 </p>
               </div>
             </div>
 
-            {/* Bedrooms (only for legacy properties) */}
-            {isLegacyProperty && (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
-                  <BedDouble className="text-primary-700" size={20} />
+            {/* Show legacy or non-legacy info */}
+            {isLegacyProperty ? (
+              <>
+                {/* Bedrooms (only for legacy properties) */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
+                    <BedDouble className="text-primary-700" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Bedrooms</p>
+                    <p className="text-sm font-medium text-primary-900">
+                      {property.beds}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Bedrooms</p>
-                  <p className="text-lg font-medium text-primary-900">
-                    {property.beds}
-                  </p>
+                {/* Bathrooms (only for legacy properties) */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
+                    <Bath className="text-primary-700" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Bathrooms</p>
+                    <p className="text-sm font-medium text-primary-900">
+                      {property.baths}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Bathrooms (only for legacy properties) */}
-            {isLegacyProperty && (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
-                  <Bath className="text-primary-700" size={20} />
+              </>
+            ) : (
+              <>
+                {/* Non-legacy: show property type and address as example */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
+                    <Home className="text-primary-700" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Type</p>
+                    <p className="text-sm font-medium text-primary-900">
+                      {property.propertyType}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Bathrooms</p>
-                  <p className="text-lg font-medium text-primary-900">
-                    {property.baths}
-                  </p>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100">
+                    <MapPin className="text-primary-700" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Address</p>
+                    <p className="text-sm font-medium text-primary-900">
+                      {property.location?.address}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Size */}
@@ -128,7 +154,7 @@ const PropertyOverview = ({ propertyId }: PropertyOverviewProps) => {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Square Feet</p>
-                <p className="text-lg font-medium text-primary-900">
+                <p className="text-sm font-medium text-primary-900">
                   {property.squareFeet.toLocaleString()}
                 </p>
               </div>

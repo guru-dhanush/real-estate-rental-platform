@@ -42,12 +42,31 @@ const Map = () => {
     markersRef.current = [];
     infoWindowsRef.current = [];
 
+    // --- New: Create LatLngBounds to fit all markers ---
+    const bounds = new google.maps.LatLngBounds();
+    console.log("properties", properties);
+
     // Add new markers
     properties.forEach((property) => {
       const { marker, infoWindow } = createPropertyMarker(property, map);
       markersRef.current.push(marker);
       infoWindowsRef.current.push(infoWindow);
+      // Extend bounds for each marker
+      bounds.extend(marker.getPosition()!);
     });
+
+    // --- New: Smoothly fit all markers in view ---
+    if (properties.length === 1) {
+      // If only one marker, pan and zoom to it
+      const marker = markersRef.current[0];
+      if (marker) {
+        map.panTo(marker.getPosition()!);
+        map.setZoom(15);
+      }
+    } else if (properties.length > 1) {
+      // Fit all markers
+      map.fitBounds(bounds, 100); // 100px padding
+    }
 
     const resizeMap = () => {
       if (map) {
@@ -80,7 +99,7 @@ const Map = () => {
     <div
       className={
         mapViewEnabled
-          ? "basis-5/12 grow relative rounded-xl overflow-hidden mt-[33px]"
+          ? "basis-5/12 grow relative rounded-xl overflow-hidden h-full"
           : "w-full relative rounded-xl overflow-hidden"
       }
     >
@@ -97,12 +116,14 @@ const Map = () => {
   );
 };
 
+// --- Fix: Ensure function boundary and export ---
+
 const createPropertyMarker = (property: Property, map: google.maps.Map) => {
   // Custom emerald green marker icon with border
   const markerIcon = {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
-        <svg height="256px" width="256px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-40.33 -40.33 584.78 584.78" xml:space="preserve" fill="#000000" transform="rotate(0)" stroke="#000000" stroke-width="0.00504123"><g id="SVGRepo_bgCarrier" stroke-width="0" transform="translate(0,0), scale(1)"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="1.008246"></g><g id="SVGRepo_iconCarrier"> <path style="fill:#0CC18E;" d="M429.064,177.018C429.064,79.258,349.822,0,252.054,0C154.301,0,75.059,79.258,75.059,177.018 c0,49.451,21.638,105.614,53.035,149.323l123.975,177.782l124.006-177.814C413.452,272.864,429.064,226.438,429.064,177.018z"></path> <path style="fill:#17DD9F;" d="M252.054,0C154.301,0,75.059,79.258,75.059,177.018"></path> <path style="fill:#039176;" d="M252.069,504.123l124.006-177.814c37.368-53.445,52.988-99.872,52.988-149.291 C429.064,79.258,349.822,0,252.054,0"></path> <path style="fill:#047F73;" d="M429.064,177.018C429.064,79.258,349.822,0,252.054,0"></path> <circle style="fill:#F44D71;" cx="252.062" cy="166.936" r="79.557"></circle> <path style="fill:#FF6679;" d="M172.528,166.936c0-43.93,35.604-79.557,79.525-79.557"></path> <path style="fill:#D60949;" d="M252.054,87.387c43.922,0,79.557,35.619,79.557,79.557c0,43.922-35.627,79.525-79.557,79.525"></path> <path style="fill:#B50444;" d="M331.603,166.936c0,43.922-35.627,79.525-79.557,79.525"></path> </g></svg>
-      `)}`,
+      <svg height="256px" width="256px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-40.33 -40.33 584.78 584.78" xml:space="preserve" fill="#000000" transform="rotate(0)" stroke="#000000" stroke-width="0.00504123"><g id="SVGRepo_bgCarrier" stroke-width="0" transform="translate(0,0), scale(1)"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="1.008246"></g><g id="SVGRepo_iconCarrier"> <path style="fill:#004b93;" d="M429.064,177.018C429.064,79.258,349.822,0,252.054,0C154.301,0,75.059,79.258,75.059,177.018 c0,49.451,21.638,105.614,53.035,149.323l123.975,177.782l124.006-177.814C413.452,272.864,429.064,226.438,429.064,177.018z"></path> <path style="fill:#004b93;opacity:0.8;" d="M252.054,0C154.301,0,75.059,79.258,75.059,177.018"></path> <path style="fill:#003366;" d="M252.069,504.123l124.006-177.814c37.368-53.445,52.988-99.872,52.988-149.291 C429.064,79.258,349.822,0,252.054,0"></path> <path style="fill:#002244;" d="M429.064,177.018C429.064,79.258,349.822,0,252.054,0"></path> <circle style="fill:#fff;" cx="252.062" cy="166.936" r="79.557"></circle> <path style="fill:#e5e7eb;" d="M172.528,166.936c0-43.93,35.604-79.557,79.525-79.557"></path> <path style="fill:#bfc9d1;" d="M252.054,87.387c43.922,0,79.557,35.619,79.557,79.557c0,43.922-35.627,79.525-79.557,79.525"></path> <path style="fill:#bfc9d1;opacity:0.7;" d="M331.603,166.936c0,43.922-35.627,79.525-79.557,79.525"></path> </g></svg>
+    `)}`,
     scaledSize: new google.maps.Size(32, 32),
     anchor: new google.maps.Point(16, 32),
   };

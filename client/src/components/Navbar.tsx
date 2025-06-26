@@ -49,7 +49,7 @@ const Navbar = () => {
   const navigationLinks = [
     { href: "/", label: "Home" },
     { href: "/search", label: "Properties" },
-    { href: "/about", label: "About" },
+    { href: "/about-us", label: "About" }, // Updated path
     { href: "/contact", label: "Contact" },
   ];
 

@@ -1,4 +1,5 @@
-import { Bath, Bed, Heart, Home, MapPin, Star } from "lucide-react";
+import { Bath, Bed, Car, Heart, Home, MapPin, PawPrint, Star } from "lucide-react";
+import { LEGACY_PROPERTY_TYPES, AmenityIcons, HighlightIcons, PropertyTypeIcons } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -13,6 +14,7 @@ const Card = ({
   const [imgSrc, setImgSrc] = useState(
     property.photoUrls?.[0] || "/placeholder.jpg"
   );
+  const isLegacyProperty = LEGACY_PROPERTY_TYPES.includes(property.propertyType);
 
   return (
     <div className="relative bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 mb-5 border border-gray-100">
@@ -70,6 +72,13 @@ const Card = ({
               )}
             </h2>
 
+            {/* Description (limited characters, CSS truncated) */}
+            {property.description && (
+              <p className="text-xs text-white/60 line-clamp-2 max-h-[2.6em] overflow-hidden">
+                {property.description}
+              </p>
+            )}
+
             {/* Location */}
             <div className="flex items-center text-xs opacity-90">
               <MapPin className="w-3 h-3 mr-1" />
@@ -77,44 +86,39 @@ const Card = ({
                 {property?.location?.address}, {property?.location?.city}
               </span>
             </div>
-
-            {/* Tags */}
-            <div className="flex gap-1 flex-wrap text-[10px] font-medium">
-              {property.isPetsAllowed && (
-                <span className="bg-white/20 text-white px-1.5 py-0.5 rounded-full border border-white/30">
-                  Pets Allowed
-                </span>
-              )}
-              {property.isParkingIncluded && (
-                <span className="bg-white/20 text-white px-1.5 py-0.5 rounded-full border border-white/30">
-                  Parking
-                </span>
-              )}
-            </div>
-
-            {/* Rating */}
-            <div className="flex items-center text-xs">
-              <div className="bg-yellow-500/20 rounded-full px-2 py-0.5 flex items-center text-white">
-                <Star className="w-3 h-3 text-yellow-300 mr-1" />
-                <span className="font-medium">{property.averageRating.toFixed(1)}</span>
-              </div>
-              <span className="text-white/70 text-[10px] ml-2">
-                ({property.numberOfReviews} reviews)
-              </span>
-            </div>
-
             {/* Features */}
             <div className="flex justify-between items-center gap-2 text-xs pt-2 border-t border-white/20">
+
               <div className="flex items-center">
-                <Bed className="w-3 h-3 mr-1 text-white/70" />
-                <span className="font-medium">{property.beds}</span>
-                <span className="ml-1 text-[10px]">Beds</span>
+                {PropertyTypeIcons[property.propertyType as keyof typeof PropertyTypeIcons] ? (
+                  React.createElement(PropertyTypeIcons[property.propertyType as keyof typeof PropertyTypeIcons], {
+                    className: "w-3 h-3 mr-1 text-white/70"
+                  })
+                ) : (
+                  <Home className="w-3 h-3 mr-1 text-white/70" />
+                )}
+                <span className="font-medium">{property.propertyType}</span>
               </div>
-              <div className="flex items-center">
-                <Bath className="w-3 h-3 mr-1 text-white/70" />
-                <span className="font-medium">{property.baths}</span>
-                <span className="ml-1 text-[10px]">Baths</span>
-              </div>
+              {isLegacyProperty ? (
+                <>
+
+
+                  <div className="flex items-center">
+                    <Bed className="w-3 h-3 mr-1 text-white/70" />
+                    <span className="font-medium">{property.beds}</span>
+                    <span className="ml-1 text-[10px]">Beds</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Bath className="w-3 h-3 mr-1 text-white/70" />
+                    <span className="font-medium">{property.baths}</span>
+                    <span className="ml-1 text-[10px]">Baths</span>
+                  </div>
+                </>
+              ) : (
+                <>
+
+                </>
+              )}
               <div className="flex items-center">
                 <Home className="w-3 h-3 mr-1 text-white/70" />
                 <span className="font-medium">{property.squareFeet}</span>
