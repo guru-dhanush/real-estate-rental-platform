@@ -29,7 +29,7 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
     console.log('S3_BUCKET_NAME:', process.env.S3_BUCKET_NAME);
 
     // Test if we can list bucket contents
-    const { ListObjectsV2Command, PutObjectCommand } = require('@aws-sdk/client-s3');
+    const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
     const listCommand = new ListObjectsV2Command({
       Bucket: process.env.S3_BUCKET_NAME!,
       Prefix: 'properties/',
@@ -39,54 +39,34 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
     const listResult = await s3Client.send(listCommand);
     console.log('S3 List Result:', listResult);
 
-    // --- Save uploaded image to local folder and upload to S3 ---
-    if (!req.file) {
-      res.status(400).json({ message: 'No image file uploaded. Please upload an image as payload with field name "image".' });
-      return;
-    }
-
-    console.log('req.file received:', req.file);
-    if (!req.file.buffer || req.file.buffer.length === 0) {
-      console.error('Uploaded file buffer is empty!');
-      res.status(400).json({ message: 'Uploaded file is empty.' });
-      return;
-    }
-    console.log('File buffer length:', req.file.buffer.length);
-
-    const uploadsDir = path.join(__dirname, '../../uploads/test-s3');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    const localFileName = `test-image-${Date.now()}-${req.file.originalname}`;
-    const localFilePath = path.join(uploadsDir, localFileName);
+    // --- Upload a test image from disk ---
+    const imagePath = path.join(__dirname, "../asset/testImage.png");
+    let imageUrl = null;
     try {
-      fs.writeFileSync(localFilePath, req.file.buffer);
-      console.log(`Saved file locally at: ${localFilePath}`);
-    } catch (writeErr) {
-      console.error('Error writing file to disk:', writeErr);
-      res.status(500).json({ message: 'Failed to write file to disk', error: writeErr instanceof Error ? writeErr.message : String(writeErr) });
-      return;
-    }
-
-    const testKey = `properties/${localFileName}`;
-    try {
-      const fileBuffer = fs.readFileSync(localFilePath);
+      await new Promise((resolve, reject) => {
+        fs.access(imagePath, fs.constants.R_OK, (err) => {
+          if (err) {
+            reject(new Error("Test image not found or not readable: " + imagePath));
+          } else {
+            resolve(true);
+          }
+        });
+      });
+      const testImageBuffer = fs.readFileSync(imagePath);
+      const testKey = `properties/test-image-${Date.now()}.png`;
       const putCommand = new PutObjectCommand({
         Bucket: process.env.S3_BUCKET_NAME!,
         Key: testKey,
-        Body: fileBuffer,
-        ContentType: req.file.mimetype
+        Body: testImageBuffer,
+        ContentType: "image/png"
       });
       await s3Client.send(putCommand);
-      const imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${testKey}`;
-      // Optionally, clean up local file after upload
-      // fs.unlinkSync(localFilePath);
+      imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${testKey}`;
       res.json({
         message: 'S3 connection successful',
         region: process.env.AWS_REGION,
         bucket: process.env.S3_BUCKET_NAME,
-        testImageUrl: imageUrl,
-        localFilePath: localFilePath.replace(/\\/g, '/')
+        testImageUrl: imageUrl
       });
     } catch (imgErr) {
       console.error("Error uploading test image:", imgErr);
@@ -95,7 +75,6 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
         error: imgErr instanceof Error ? imgErr.message : String(imgErr),
         region: process.env.AWS_REGION,
         bucket: process.env.S3_BUCKET_NAME,
-        localFilePath: localFilePath.replace(/\\/g, '/')
       });
     }
     return;
