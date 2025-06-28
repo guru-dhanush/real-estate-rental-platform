@@ -28,56 +28,38 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
     console.log('AWS_REGION:', process.env.AWS_REGION);
     console.log('S3_BUCKET_NAME:', process.env.S3_BUCKET_NAME);
 
-    // Test if we can list bucket contents
-    const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
-    const listCommand = new ListObjectsV2Command({
+    if (!req.file) {
+      res.status(400).json({ message: 'No image file uploaded. Please upload an image as payload with field name "image".' });
+      return;
+    }
+
+    console.log('req.file received:', req.file);
+    console.log("MIME Type:", req.file.mimetype);
+
+    const fileBuffer = req.file.buffer;
+    if (!fileBuffer || fileBuffer.length === 0) {
+      res.status(400).json({ message: 'Uploaded file is empty.' });
+      return;
+    }
+
+    const fileKey = `properties/test-image-${Date.now()}-${req.file.originalname}`;
+
+    const putCommand = new PutObjectCommand({
       Bucket: process.env.S3_BUCKET_NAME!,
-      Prefix: 'properties/',
-      MaxKeys: 5
+      Key: fileKey,
+      Body: fileBuffer,
+      ContentType: req.file.mimetype
     });
 
-    const listResult = await s3Client.send(listCommand);
-    console.log('S3 List Result:', listResult);
+    await s3Client.send(putCommand);
 
-    // --- Upload a test image from disk ---
-    const imagePath = path.join(__dirname, "../asset/testImage.png");
-    let imageUrl = null;
-    try {
-      await new Promise((resolve, reject) => {
-        fs.access(imagePath, fs.constants.R_OK, (err) => {
-          if (err) {
-            reject(new Error("Test image not found or not readable: " + imagePath));
-          } else {
-            resolve(true);
-          }
-        });
-      });
-      const testImageBuffer = fs.readFileSync(imagePath);
-      const testKey = `properties/test-image-${Date.now()}.png`;
-      const putCommand = new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET_NAME!,
-        Key: testKey,
-        Body: testImageBuffer,
-        ContentType: "image/png"
-      });
-      await s3Client.send(putCommand);
-      imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${testKey}`;
-      res.json({
-        message: 'S3 connection successful',
-        region: process.env.AWS_REGION,
-        bucket: process.env.S3_BUCKET_NAME,
-        testImageUrl: imageUrl
-      });
-    } catch (imgErr) {
-      console.error("Error uploading test image:", imgErr);
-      res.status(500).json({
-        message: "S3 connection succeeded, but test image upload failed",
-        error: imgErr instanceof Error ? imgErr.message : String(imgErr),
-        region: process.env.AWS_REGION,
-        bucket: process.env.S3_BUCKET_NAME,
-      });
-    }
-    return;
+    const imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+
+    res.json({
+      message: 'S3 connection successful',
+      testImageUrl: imageUrl
+    });
+
   } catch (error: any) {
     console.error('S3 connection error:', error);
     res.status(500).json({
