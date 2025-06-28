@@ -14,7 +14,6 @@ import { S3Client } from "@aws-sdk/client-s3";
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-
 const router = express.Router();
 
 router.get("/", getProperties);
@@ -31,7 +30,10 @@ router.put(
   upload.array("photos"),
   updateProperty
 );
-
-
 router.delete("/:id", authMiddleware(["manager"]), deleteProperty);
+router.post(
+  "/test-s3",
+  upload.single("image"),
+  testS3Connection
+);
 export default router;
