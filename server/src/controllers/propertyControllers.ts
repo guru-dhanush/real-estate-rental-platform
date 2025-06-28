@@ -374,76 +374,45 @@ export const createProperty = async (
     // Handle photo uploads if files are provided
     if (files && files.length > 0) {
       console.log(`[createProperty] Uploading ${files.length} photos to S3...`);
-
-      // Use for...of loop instead of Promise.all for better error handling
-      for (let index = 0; index < files.length; index++) {
-        const file = files[index];
-        console.log(
-          `[createProperty] Uploading file ${index + 1}/${files.length}: ${file.originalname} (${file.size} bytes)`
-        );
-
-        try {
-          // Validate file before upload
-          if (!file.buffer || file.buffer.length === 0) {
-            console.error(`[createProperty] File ${index + 1} has no buffer or empty buffer`);
-            throw new Error(`File ${file.originalname} is empty or corrupted`);
-          }
-
-          const uploadParams = {
-            Bucket: process.env.S3_BUCKET_NAME!,
-            Key: `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`,
-            Body: file.buffer,
-            ContentType: file.mimetype,
-          };
-
-          const uploadResult = await new Upload({
-            client: s3Client,
-            params: uploadParams,
-          }).done();
-
-          if (uploadResult.Location) {
-            photoUrls.push(uploadResult.Location);
-            console.log(
-              `[createProperty] File ${index + 1} uploaded successfully to ${uploadResult.Location}`
-            );
-          } else {
-            console.error(`[createProperty] Upload result for file ${index + 1} has no Location`);
-            throw new Error(`Failed to get upload location for ${file.originalname}`);
-          }
-        } catch (uploadError: any) {
-          console.error(
-            `[createProperty] Error uploading file ${index + 1}:`,
-            uploadError
-          );
-
-          // Clean up any successfully uploaded files before throwing error
-          if (photoUrls.length > 0) {
-            console.log(`[createProperty] Cleaning up ${photoUrls.length} uploaded files due to error`);
-            for (const url of photoUrls) {
-              try {
-                const key = url.split("/").slice(-1)[0]; // Get filename from URL
-                await s3Client.send(
-                  new DeleteObjectCommand({
-                    Bucket: process.env.S3_BUCKET_NAME!,
-                    Key: `properties/${key}`,
-                  })
-                );
-              } catch (deleteError) {
-                console.error(`[createProperty] Error cleaning up file ${url}:`, deleteError);
-              }
-            }
-          }
-
-          throw new Error(
-            `Failed to upload image ${file.originalname}: ${uploadError.message}`
-          );
+      const uploadPromises = files.map((file, idx) => {
+        if (!file.buffer || file.buffer.length === 0) {
+          return Promise.reject(new Error(`File ${file.originalname} is empty or corrupted`));
         }
+        const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        const uploadParams = {
+          Bucket: process.env.S3_BUCKET_NAME!,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+        return new Upload({ client: s3Client, params: uploadParams })
+          .done()
+          .then(() => {
+            const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+            return url;
+          });
+      });
+      const uploadResults = await Promise.allSettled(uploadPromises);
+      const failed = uploadResults.filter(r => r.status === 'rejected');
+      const succeeded = uploadResults.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<string>).value);
+      if (failed.length > 0) {
+        // Clean up any successful uploads
+        await Promise.allSettled(succeeded.map(async (url) => {
+          const key = url.split('/').slice(-2).join('/');
+          try {
+            await s3Client.send(new DeleteObjectCommand({
+              Bucket: process.env.S3_BUCKET_NAME!,
+              Key: key,
+            }));
+            console.log(`[createProperty] Cleaned up uploaded file: ${url}`);
+          } catch (e) {
+            console.error(`[createProperty] Error cleaning up file ${url}:`, e);
+          }
+        }));
+        throw new Error(`Failed to upload all images. ${failed.length} failed.`);
       }
-
-      console.log(
-        `[createProperty] All photos uploaded successfully:`,
-        photoUrls
-      );
+      photoUrls = succeeded;
+      console.log(`[createProperty] All photos uploaded successfully:`, photoUrls);
     } else {
       console.log(`[createProperty] No files to upload`);
     }
@@ -696,27 +665,44 @@ export const updateProperty = async (
     // Handle photo uploads if new files are provided
     const newPhotoUrls: string[] = [];
     if (files && files.length > 0) {
-      for (const file of files) {
-        try {
-          const uploadParams = {
-            Bucket: process.env.S3_BUCKET_NAME!,
-            Key: `properties/${Date.now()}-${file.originalname}`,
-            Body: file.buffer,
-            ContentType: file.mimetype,
-          };
-
-          const uploadResult = await new Upload({
-            client: s3Client,
-            params: uploadParams,
-          }).done();
-
-          if (uploadResult.Location) {
-            newPhotoUrls.push(uploadResult.Location);
-          }
-        } catch (err) {
-          console.error(`Error uploading file ${file.originalname}:`, err);
+      const uploadPromises = files.map((file) => {
+        if (!file.buffer || file.buffer.length === 0) {
+          return Promise.reject(new Error(`File ${file.originalname} is empty or corrupted`));
         }
+        const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        const uploadParams = {
+          Bucket: process.env.S3_BUCKET_NAME!,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        };
+        return new Upload({ client: s3Client, params: uploadParams })
+          .done()
+          .then(() => {
+            const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+            return url;
+          });
+      });
+      const uploadResults = await Promise.allSettled(uploadPromises);
+      const failed = uploadResults.filter(r => r.status === 'rejected');
+      const succeeded = uploadResults.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<string>).value);
+      if (failed.length > 0) {
+        // Clean up any successful uploads
+        await Promise.allSettled(succeeded.map(async (url) => {
+          const key = url.split('/').slice(-2).join('/');
+          try {
+            await s3Client.send(new DeleteObjectCommand({
+              Bucket: process.env.S3_BUCKET_NAME!,
+              Key: key,
+            }));
+            console.log(`[updateProperty] Cleaned up uploaded file: ${url}`);
+          } catch (e) {
+            console.error(`[updateProperty] Error cleaning up file ${url}:`, e);
+          }
+        }));
+        throw new Error(`Failed to upload all images. ${failed.length} failed.`);
       }
+      newPhotoUrls.push(...succeeded);
     }
 
     // Delete removed images from S3
