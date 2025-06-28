@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { wktToGeoJSON } from "@terraformer/wkt";
-import { DeleteObjectCommand, S3Client, ObjectCannedACL } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import axios from "axios";
 
@@ -358,7 +358,6 @@ export const createProperty = async (
             Key: `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
-            ACL: ObjectCannedACL.public_read,
           };
 
           const uploadResult = await new Upload({
@@ -668,7 +667,6 @@ export const updateProperty = async (
             Key: `properties/${Date.now()}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
-            ACL: ObjectCannedACL.public_read,
           };
 
           const uploadResult = await new Upload({
