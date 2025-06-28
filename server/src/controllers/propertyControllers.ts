@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { wktToGeoJSON } from "@terraformer/wkt";
-import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import axios from "axios";
+import fs from "fs";
+import path from "path";
 
 const prisma = new PrismaClient();
 
@@ -37,11 +39,46 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
     const listResult = await s3Client.send(listCommand);
     console.log('S3 List Result:', listResult);
 
-    res.json({
-      message: 'S3 connection successful',
-      region: process.env.AWS_REGION,
-      bucket: process.env.S3_BUCKET_NAME,
-    });
+    // --- Upload a test image from disk ---
+    const imagePath = path.join(__dirname, "../asset/testImage.png");
+    let imageUrl = null;
+    try {
+      await new Promise((resolve, reject) => {
+        fs.access(imagePath, fs.constants.R_OK, (err) => {
+          if (err) {
+            reject(new Error("Test image not found or not readable: " + imagePath));
+          } else {
+            resolve(true);
+          }
+        });
+      });
+      const testImageBuffer = fs.readFileSync(imagePath);
+      const testKey = `test/test-image-${Date.now()}.png`;
+      const putCommand = new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME!,
+        Key: testKey,
+        Body: testImageBuffer,
+        ContentType: "image/png",
+        ACL: "public-read"
+      });
+      await s3Client.send(putCommand);
+      imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${testKey}`;
+      res.json({
+        message: 'S3 connection successful',
+        region: process.env.AWS_REGION,
+        bucket: process.env.S3_BUCKET_NAME,
+        testImageUrl: imageUrl
+      });
+    } catch (imgErr) {
+      console.error("Error uploading test image:", imgErr);
+      res.status(500).json({
+        message: "S3 connection succeeded, but test image upload failed",
+        error: imgErr instanceof Error ? imgErr.message : String(imgErr),
+        region: process.env.AWS_REGION,
+        bucket: process.env.S3_BUCKET_NAME,
+      });
+    }
+    return;
   } catch (error: any) {
     console.error('S3 connection error:', error);
     res.status(500).json({
@@ -355,7 +392,7 @@ export const createProperty = async (
 
           const uploadParams = {
             Bucket: process.env.S3_BUCKET_NAME!,
-            Key: `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`,
+            Key: `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`,
             Body: file.buffer,
             ContentType: file.mimetype,
           };
