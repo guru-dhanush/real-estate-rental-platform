@@ -58,8 +58,7 @@ export const testS3Connection = async (req: Request, res: Response): Promise<voi
         Bucket: process.env.S3_BUCKET_NAME!,
         Key: testKey,
         Body: testImageBuffer,
-        ContentType: "image/png",
-        ACL: "public-read"
+        ContentType: "image/png"
       });
       await s3Client.send(putCommand);
       imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${testKey}`;
