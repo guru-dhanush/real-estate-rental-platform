@@ -14,9 +14,6 @@ import { S3Client } from "@aws-sdk/client-s3";
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-});
 
 const router = express.Router();
 
