@@ -28,6 +28,7 @@ import "filepond/dist/filepond.min.css";
 import FilePondPluginImagePreview from "filepond-plugin-image-preview";
 import FilePondPluginImageExifOrientation from "filepond-plugin-image-exif-orientation";
 import "filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css";
+import MultiSelect from "./ui/select/MultiSelect";
 
 registerPlugin(FilePondPluginImageExifOrientation, FilePondPluginImagePreview);
 
@@ -43,6 +44,7 @@ interface FormFieldProps {
   | "switch"
   | "password"
   | "file"
+  | "multi-select"
   | "multi-input";
   placeholder?: string;
   options?: { value: string; label: string }[];
@@ -79,7 +81,6 @@ export const CustomFormField: React.FC<FormFieldProps> = ({
   ) => {
     // Combine field value with initialValue if field value is undefined
     const value = field.value !== undefined ? field.value : initialValue;
-
     switch (type) {
       case "textarea":
         return (
@@ -91,10 +92,24 @@ export const CustomFormField: React.FC<FormFieldProps> = ({
             className={`border-gray-200 p-4 ${inputClassName}`}
           />
         );
+      case "multi-select":
+        // Ensure value is always an array
+        const currentValue = Array.isArray(value) ? value : [];
+
+        return (
+          <MultiSelect
+            options={options?.map(opt => opt.label) || []}
+            value={currentValue}
+            onChange={(selected) => field.onChange(selected)}
+            placeholder={placeholder}
+            className={`w-full border-gray-200 p-4 ${inputClassName}`}
+            disabled={disabled}
+          />
+        );
       case "select":
         return (
           <Select
-            value={value}
+            defaultValue={value}
             onValueChange={field.onChange}
           >
             <SelectTrigger
@@ -199,22 +214,3 @@ export const CustomFormField: React.FC<FormFieldProps> = ({
     />
   );
 };
-
-// Updated Input component
-interface InputProps {
-  type?: "text" | "number" | "email" | "password" | "date" | "time" | string;
-  id?: string;
-  name?: string;
-  placeholder?: string;
-  value?: string | number;
-  defaultValue?: string | number;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  className?: string;
-  min?: string;
-  max?: string;
-  step?: number;
-  disabled?: boolean;
-  success?: boolean;
-  error?: boolean;
-  hint?: string;
-}

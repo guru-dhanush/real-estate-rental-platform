@@ -571,21 +571,29 @@ export const updateProperty = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
-  const files = req.files as Express.Multer.File[];
-  const {
-    address,
-    city,
-    state,
-    country,
-    postalCode,
-    existingPhotoUrls,
-    deletedPhotoUrls,
-    ...propertyData
-  } = req.body;
-  console.log("req.body", req.body);
+  console.log(`[updateProperty] Request received for property id: ${req.params.id}`);
+  console.log(`[updateProperty] Body:`, req.body);
+  console.log(
+    `[updateProperty] Files:`,
+    req.files
+      ? `${(req.files as Express.Multer.File[]).length} files received`
+      : "No files received"
+  );
 
   try {
+    const { id } = req.params;
+    const files = req.files as S3MulterFile[];
+    const {
+      address,
+      city,
+      state,
+      country,
+      postalCode,
+      existingPhotoUrls,
+      deletedPhotoUrls,
+      ...propertyData
+    } = req.body;
+
     // Get existing property first
     const existingProperty = await prisma.property.findUnique({
       where: { id: Number(id) },
@@ -593,12 +601,16 @@ export const updateProperty = async (
     });
 
     if (!existingProperty) {
+      console.log(`[updateProperty] Property with id ${id} not found`);
       res.status(404).json({ message: "Property not found" });
       return;
     }
 
-    // Parse the photo URLs from the request and ensure they're all strings
+    // Initialize photo arrays
     let photosToKeep: string[] = [];
+    let photosToDelete: string[] = [];
+
+    // Parse existing photo URLs
     if (existingPhotoUrls) {
       try {
         const parsed = JSON.parse(existingPhotoUrls);
@@ -609,7 +621,7 @@ export const updateProperty = async (
           );
         }
       } catch (e) {
-        console.error("Error parsing existingPhotoUrls:", e);
+        console.error(`[updateProperty] Error parsing existingPhotoUrls:`, e);
       }
     } else if (Array.isArray(existingProperty.photoUrls)) {
       photosToKeep = existingProperty.photoUrls.filter(
@@ -618,8 +630,7 @@ export const updateProperty = async (
       );
     }
 
-    // Parse the deleted photo URLs
-    let photosToDelete: string[] = [];
+    // Parse deleted photo URLs
     if (deletedPhotoUrls) {
       try {
         const parsed = JSON.parse(deletedPhotoUrls);
@@ -630,54 +641,62 @@ export const updateProperty = async (
           );
         }
       } catch (e) {
-        console.error("Error parsing deletedPhotoUrls:", e);
+        console.error(`[updateProperty] Error parsing deletedPhotoUrls:`, e);
       }
     }
 
-    // Handle photo uploads if new files are provided
-    const newPhotoUrls: string[] = [];
+    // Handle new photo uploads
+    let newPhotoUrls: string[] = [];
     if (files && files.length > 0) {
-      const uploadPromises = files.map((file) => {
-        const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
-        return new Promise((resolve, reject) => {
-          const uploadStream = s3Client.send(new PutObjectCommand({
+      console.log(`[updateProperty] Processing ${files.length} new photos...`);
+      
+      const uploadPromises = files.map(async (file) => {
+        try {
+          const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+          
+          // Upload to S3
+          const uploadResult = await s3Client.send(new PutObjectCommand({
             Bucket: process.env.S3_BUCKET_NAME!,
             Key: key,
             Body: file.buffer,
             ContentType: file.mimetype,
           }));
 
-          uploadStream.then(() => {
-            const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-            resolve(url);
-          }).catch(reject);
-        });
+          const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+          console.log(`[updateProperty] File uploaded to: ${url}`);
+          return url;
+        } catch (error) {
+          console.error(`[updateProperty] Error uploading file:`, error);
+          throw error;
+        }
       });
-      const uploadResults = await Promise.allSettled(uploadPromises);
-      const failed = uploadResults.filter(r => r.status === 'rejected');
-      const succeeded = uploadResults.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<string>).value);
-      if (failed.length > 0) {
-        // Clean up any successful uploads
-        await Promise.allSettled(succeeded.map(async (url) => {
-          const key = url.split('/').slice(-2).join('/');
-          try {
-            await s3Client.send(new DeleteObjectCommand({
-              Bucket: process.env.S3_BUCKET_NAME!,
-              Key: key,
-            }));
-            console.log(`[updateProperty] Cleaned up uploaded file: ${url}`);
-          } catch (e) {
-            console.error(`[updateProperty] Error cleaning up file ${url}:`, e);
-          }
-        }));
-        throw new Error(`Failed to upload all images. ${failed.length} failed.`);
+
+      try {
+        newPhotoUrls = await Promise.all(uploadPromises);
+      } catch (error) {
+        // Cleanup any successful uploads if there was an error
+        if (newPhotoUrls.length > 0) {
+          await Promise.allSettled(newPhotoUrls.map(async (url) => {
+            try {
+              const key = url.split('/').slice(-2).join('/');
+              await s3Client.send(new DeleteObjectCommand({
+                Bucket: process.env.S3_BUCKET_NAME!,
+                Key: key,
+              }));
+              console.log(`[updateProperty] Cleaned up uploaded file: ${url}`);
+            } catch (e) {
+              console.error(`[updateProperty] Error cleaning up file ${url}:`, e);
+            }
+          }));
+        }
+        throw error;
       }
-      newPhotoUrls.push(...succeeded);
     }
 
     // Delete removed images from S3
     if (photosToDelete.length > 0) {
-      for (const url of photosToDelete) {
+      console.log(`[updateProperty] Deleting ${photosToDelete.length} images from S3...`);
+      const deletePromises = photosToDelete.map(async (url) => {
         try {
           const key = url.split("/").pop();
           if (key) {
@@ -687,15 +706,17 @@ export const updateProperty = async (
                 Key: `properties/${key}`,
               })
             );
-            console.log(`Deleted image from S3: ${url}`);
+            console.log(`[updateProperty] Deleted image from S3: ${url}`);
           }
         } catch (err) {
-          console.error(`Error deleting image ${url}:`, err);
+          console.error(`[updateProperty] Error deleting image ${url}:`, err);
         }
-      }
+      });
+
+      await Promise.all(deletePromises);
     }
 
-    // Combine kept and new photo URLs - ensure all values are strings
+    // Combine kept and new photo URLs
     const allPhotoUrls: string[] = [
       ...photosToKeep.filter((url) => !photosToDelete.includes(url)),
       ...newPhotoUrls,
@@ -704,6 +725,7 @@ export const updateProperty = async (
     // Update location if address details changed
     let locationId = existingProperty.locationId;
     if (address || city || state || country || postalCode) {
+      console.log(`[updateProperty] Updating location details...`);
       const [location] = await prisma.$queryRaw<LocationResult[]>`
         UPDATE "Location"
         SET 
@@ -718,7 +740,7 @@ export const updateProperty = async (
       locationId = location.id;
     }
 
-    // Process property data with proper type safety
+    // Process property data
     const amenitiesArray: string[] = propertyData.amenities
       ? typeof propertyData.amenities === "string"
         ? propertyData.amenities.split(",").filter(Boolean)
@@ -741,15 +763,16 @@ export const updateProperty = async (
           : existingProperty.highlights || []
       : existingProperty.highlights || [];
 
-    // Update property with strict typing
+    // Update property
+    console.log(`[updateProperty] Updating property record...`);
     const updatedProperty = await prisma.property.update({
       where: { id: Number(id) },
       data: {
         ...propertyData,
-        photoUrls: allPhotoUrls as string[], // Explicitly cast to string[]
+        photoUrls: allPhotoUrls as string[],
         locationId,
-        amenities: amenitiesArray as any[], // Cast to any[] for Prisma enum array
-        highlights: highlightsArray as any[], // Cast to any[] for Prisma enum array
+        amenities: amenitiesArray as any[],
+        highlights: highlightsArray as any[],
         isPetsAllowed: propertyData.isPetsAllowed === "true",
         isParkingIncluded: propertyData.isParkingIncluded === "true",
         pricePerMonth: parseFloat(propertyData.pricePerMonth) || 0,
@@ -765,9 +788,29 @@ export const updateProperty = async (
       },
     });
 
+    console.log(`[updateProperty] Property updated successfully`);
     res.json(updatedProperty);
   } catch (err: any) {
-    console.error("Error updating property:", err);
+    console.error(`[updateProperty] Error:`, err);
+    console.error(`[updateProperty] Stack trace:`, err.stack);
+    
+    // Clean up any uploaded files if there was an error
+    if (req.files && Array.isArray(req.files)) {
+      const files = req.files as S3MulterFile[];
+      console.log(`[updateProperty] Cleaning up ${files.length} uploaded files due to error...`);
+      await Promise.allSettled(files.map(async (file) => {
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: file.key,
+          }));
+          console.log(`[updateProperty] Cleaned up uploaded file: ${file.key}`);
+        } catch (e) {
+          console.error(`[updateProperty] Error cleaning up file ${file.key}:`, e);
+        }
+      }));
+    }
+
     res.status(500).json({
       message: `Error updating property: ${err.message}`,
       error: process.env.NODE_ENV === "development" ? err.stack : undefined,
@@ -779,25 +822,56 @@ export const deleteProperty = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
+  console.log(`[deleteProperty] Request received for property id: ${req.params.id}`);
 
   try {
-    // First get the property to access locationId
+    const { id } = req.params;
+
+    // First get the property to access locationId and photo URLs
     const property = await prisma.property.findUnique({
       where: { id: Number(id) },
+      include: {
+        location: true,
+      },
     });
 
     if (!property) {
+      console.log(`[deleteProperty] Property with id ${id} not found`);
       res.status(404).json({ message: "Property not found" });
       return;
     }
 
+    // Delete associated images from S3
+    if (Array.isArray(property.photoUrls)) {
+      console.log(`[deleteProperty] Deleting ${property.photoUrls.length} associated images from S3...`);
+      const deletePromises = property.photoUrls.map(async (url) => {
+        try {
+          const key = url.split("/").pop();
+          if (key) {
+            await s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: process.env.S3_BUCKET_NAME!,
+                Key: `properties/${key}`,
+              })
+            );
+            console.log(`[deleteProperty] Deleted image from S3: ${url}`);
+          }
+        } catch (err) {
+          console.error(`[deleteProperty] Error deleting image ${url}:`, err);
+        }
+      });
+
+      await Promise.all(deletePromises);
+    }
+
     // Delete the property (this will cascade to related records)
+    console.log(`[deleteProperty] Deleting property record...`);
     await prisma.property.delete({
       where: { id: Number(id) },
     });
 
     // Delete the location (if no other properties reference it)
+    console.log(`[deleteProperty] Cleaning up location record...`);
     await prisma.location.deleteMany({
       where: {
         id: property.locationId,
@@ -805,8 +879,11 @@ export const deleteProperty = async (
       },
     });
 
+    console.log(`[deleteProperty] Property and associated data deleted successfully`);
     res.status(204).send();
   } catch (err: any) {
+    console.error(`[deleteProperty] Error:`, err);
+    console.error(`[deleteProperty] Stack trace:`, err.stack);
     res
       .status(500)
       .json({ message: `Error deleting property: ${err.message}` });

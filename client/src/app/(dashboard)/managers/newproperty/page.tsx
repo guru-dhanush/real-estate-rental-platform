@@ -14,7 +14,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import  Button  from "@/components/ui/button/Button";
+import Button from "@/components/ui/button/Button";
+import ComponentCard from "@/components/common/ComponentCard";
 
 const NewProperty = () => {
   const [createProperty] = useCreatePropertyMutation();
@@ -31,8 +32,8 @@ const NewProperty = () => {
       isPetsAllowed: true,
       isParkingIncluded: true,
       photoUrls: [],
-      amenities: "",
-      highlights: "",
+      amenities: [],
+      highlights: [],
       beds: 0,
       baths: 0,
       squareFeet: 1000,
@@ -80,12 +81,8 @@ const NewProperty = () => {
   };
 
   return (
-    <div className="dashboard-container">
-      <Header
-        title="Add New Property"
-        subtitle="Create a new property listing with detailed information"
-      />
-      <div className="bg-white rounded-xl p-6">
+    <ComponentCard title="Add New Property" desc="Create a new property listing with detailed information">
+      <div className="bg-white rounded-xl">
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
@@ -195,20 +192,20 @@ const NewProperty = () => {
                 <CustomFormField
                   name="amenities"
                   label="Amenities"
-                  type="select"
                   options={Object.keys(AmenityEnum).map((amenity) => ({
                     value: amenity,
                     label: amenity,
                   }))}
+                  type="multi-select"
                 />
                 <CustomFormField
                   name="highlights"
                   label="Highlights"
-                  type="select"
                   options={Object.keys(HighlightEnum).map((highlight) => ({
                     value: highlight,
                     label: highlight,
                   }))}
+                  type="multi-select"
                 />
               </div>
             </div>
@@ -259,7 +256,7 @@ const NewProperty = () => {
           </form>
         </Form>
       </div>
-    </div>
+    </ComponentCard>
   );
 };
 

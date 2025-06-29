@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import Loading from "@/components/Loading";
 import Header from "@/components/Header";
 import { ImageUploader } from "@/components/ImageUploader";
+import ComponentCard from "@/components/common/ComponentCard";
 
 const EditProperty = () => {
   const router = useRouter();
@@ -34,8 +35,8 @@ const EditProperty = () => {
       isPetsAllowed: false,
       isParkingIncluded: false,
       photoUrls: [],
-      amenities: "",
-      highlights: "",
+      amenities: [],
+      highlights: [],
       beds: 0,
       baths: 0,
       squareFeet: 0,
@@ -61,8 +62,8 @@ const EditProperty = () => {
         isPetsAllowed: property.isPetsAllowed || false,
         isParkingIncluded: property.isParkingIncluded || false,
         photoUrls: property.photoUrls || [],
-        amenities: property.amenities?.join(",") || "",
-        highlights: property.highlights?.join(",") || "",
+        amenities: property.amenities || [],
+        highlights: property.highlights || [],
         beds: property.beds || 0,
         baths: property.baths || 0,
         squareFeet: property.squareFeet || 0,
@@ -125,12 +126,8 @@ const EditProperty = () => {
   if (isLoading) return <Loading />
 
   return (
-    <div className="dashboard-container">
-      <Header
-        title="Edit Property"
-        subtitle="Update your property listing information"
-      />
-      <div className="bg-white rounded-xl p-6">
+    <ComponentCard className="dashboard-container" title="Edit Property" desc="Update your property listing information">
+      <div className="bg-white rounded-xl">
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
@@ -239,20 +236,20 @@ const EditProperty = () => {
                 <CustomFormField
                   name="amenities"
                   label="Amenities"
-                  type="select"
                   options={Object.keys(AmenityEnum).map((amenity) => ({
                     value: amenity,
                     label: amenity,
                   }))}
+                  type="multi-select"
                 />
                 <CustomFormField
                   name="highlights"
                   label="Highlights"
-                  type="select"
                   options={Object.keys(HighlightEnum).map((highlight) => ({
                     value: highlight,
                     label: highlight,
                   }))}
+                  type="multi-select"
                 />
               </div>
             </div>
@@ -312,7 +309,7 @@ const EditProperty = () => {
           </form>
         </Form>
       </div>
-    </div >
+    </ComponentCard >
   );
 };
 

@@ -14,8 +14,8 @@ export const propertySchema = z.object({
     z.array(z.instanceof(File)), // For new files
     z.array(z.any()) // Mixed array during form handling
   ]),
-  amenities: z.string().min(1, "Amenities are required"),
-  highlights: z.string().min(1, "Highlights are required"),
+  amenities: z.array(z.string()).min(1, "At least one amenity is required"),
+  highlights: z.array(z.string()).min(1, "At least one highlight is required"),
   beds: z.coerce.number().int(),
   baths: z.coerce.number().int(),
   squareFeet: z.coerce.number().int().positive(),
