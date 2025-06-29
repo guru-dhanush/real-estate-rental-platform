@@ -69,7 +69,7 @@ const NewProperty = () => {
           formData.append("photos", file);
         });
       } else if (Array.isArray(value)) {
-        formData.append(key, JSON.stringify(value));
+        formData.append(key, value.join(','));
       } else {
         formData.append(key, String(value));
       }
