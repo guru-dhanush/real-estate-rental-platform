@@ -16,7 +16,6 @@ import managerRoutes from "./routes/managerRoutes";
 import propertyRoutes from "./routes/propertyRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import { errorHandler } from "./middleware/errorMiddleware";
-import { testS3Connection } from "./controllers/propertyControllers";
 
 /* CONFIGURATIONS */
 dotenv.config();
@@ -47,7 +46,6 @@ app.use("/properties", propertyRoutes);
 app.use("/tenants", authMiddleware(["tenant"]), tenantRoutes);
 app.use("/managers", managerRoutes);
 app.use("/chats", chatRoutes);
-app.get("/test-s3", testS3Connection);
 
 /* ERROR HANDLING MIDDLEWARE */
 app.use(errorHandler);

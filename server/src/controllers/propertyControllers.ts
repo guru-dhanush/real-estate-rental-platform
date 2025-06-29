@@ -1,17 +1,24 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { wktToGeoJSON } from "@terraformer/wkt";
-import { DeleteObjectCommand, S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import axios from "axios";
-import fs from "fs";
-import path from "path";
+
 
 const prisma = new PrismaClient();
 
+// Initialize S3 client
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    }
+    : undefined,
 });
+
+
 
 interface LocationResult {
   id: number;
@@ -22,54 +29,46 @@ interface LocationResult {
   postalCode: string;
 }
 
-export const testS3Connection = async (req: Request, res: Response): Promise<void> => {
+interface S3MulterFile extends Express.Multer.File {
+  key: string;
+  etag?: string;
+  location?: string;
+  bucket?: string;
+}
+
+export const testUpload = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    console.log('Testing S3 connection...');
-    console.log('AWS_REGION:', process.env.AWS_REGION);
-    console.log('S3_BUCKET_NAME:', process.env.S3_BUCKET_NAME);
-
-    if (!req.file) {
-      res.status(400).json({ message: 'No image file uploaded. Please upload an image as payload with field name "image".' });
-      return;
+    const files = req.files as S3MulterFile[];
+    if (!files || files.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+      return
     }
 
-    console.log('req.file received:', req.file);
-    console.log("MIME Type:", req.file.mimetype);
-
-    const fileBuffer = req.file.buffer;
-    if (!fileBuffer || fileBuffer.length === 0) {
-      res.status(400).json({ message: 'Uploaded file is empty.' });
-      return;
-    }
-
-    const fileKey = `properties/test-image-${Date.now()}-${req.file.originalname}`;
-
-    const putCommand = new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET_NAME!,
-      Key: fileKey,
-      Body: fileBuffer,
-      ContentType: req.file.mimetype
-    });
-
-    await s3Client.send(putCommand);
-
-    const imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+    const uploadedFiles = files.map(file => ({
+      url: file.location || `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${file.key}`,
+      key: file.key,
+      etag: file.etag,
+      bucket: file.bucket
+    }));
 
     res.json({
-      message: 'S3 connection successful',
-      testImageUrl: imageUrl
+      success: true,
+      message: 'Files uploaded successfully',
+      data: uploadedFiles
     });
-
   } catch (error: any) {
-    console.error('S3 connection error:', error);
     res.status(500).json({
-      message: 'S3 connection failed',
-      error: error.message,
-      code: error.code
+      success: false,
+      message: error.message
     });
   }
-};
-
+}
 
 export const getProperties = async (
   req: Request,
@@ -328,7 +327,8 @@ export const createProperty = async (
   );
 
   try {
-    const files = req.files as Express.Multer.File[];
+    // Cast files to S3MulterFile to access S3-specific properties
+    const files = req.files as S3MulterFile[];
     const {
       address,
       city,
@@ -355,48 +355,19 @@ export const createProperty = async (
 
     // Handle photo uploads if files are provided
     if (files && files.length > 0) {
-      console.log(`[createProperty] Uploading ${files.length} photos to S3...`);
-      const uploadPromises = files.map((file, idx) => {
-        if (!file.buffer || file.buffer.length === 0) {
-          return Promise.reject(new Error(`File ${file.originalname} is empty or corrupted`));
-        }
-        const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
-        const uploadParams = {
-          Bucket: process.env.S3_BUCKET_NAME!,
-          Key: key,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        };
-        return new Upload({ client: s3Client, params: uploadParams })
-          .done()
-          .then(() => {
-            const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-            return url;
-          });
+      console.log(`[createProperty] Processing ${files.length} uploaded photos...`);
+
+      // Extract URLs from already uploaded files
+      photoUrls = files.map(file => {
+        // Use the location property from multer-S3 or construct URL from key
+        const url = file.location || `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${file.key}`;
+        console.log(`[createProperty] File uploaded to: ${url}`);
+        return url;
       });
-      const uploadResults = await Promise.allSettled(uploadPromises);
-      const failed = uploadResults.filter(r => r.status === 'rejected');
-      const succeeded = uploadResults.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<string>).value);
-      if (failed.length > 0) {
-        // Clean up any successful uploads
-        await Promise.allSettled(succeeded.map(async (url) => {
-          const key = url.split('/').slice(-2).join('/');
-          try {
-            await s3Client.send(new DeleteObjectCommand({
-              Bucket: process.env.S3_BUCKET_NAME!,
-              Key: key,
-            }));
-            console.log(`[createProperty] Cleaned up uploaded file: ${url}`);
-          } catch (e) {
-            console.error(`[createProperty] Error cleaning up file ${url}:`, e);
-          }
-        }));
-        throw new Error(`Failed to upload all images. ${failed.length} failed.`);
-      }
-      photoUrls = succeeded;
-      console.log(`[createProperty] All photos uploaded successfully:`, photoUrls);
+
+      console.log(`[createProperty] All photo URLs processed:`, photoUrls);
     } else {
-      console.log(`[createProperty] No files to upload`);
+      console.log(`[createProperty] No files to process`);
     }
 
     console.log(`[createProperty] Geocoding address...`);
@@ -544,7 +515,7 @@ export const createProperty = async (
     const newProperty = await prisma.property.create({
       data: {
         ...propertyData,
-        photoUrls, // This should now be a properly typed string array
+        photoUrls, // This now contains actual S3 URLs
         locationId: location.id,
         managerCognitoId,
         amenities: amenitiesArray,
@@ -571,6 +542,25 @@ export const createProperty = async (
   } catch (err: any) {
     console.error(`[createProperty] Error:`, err);
     console.error(`[createProperty] Stack trace:`, err.stack);
+
+    // If there's an error after files were uploaded, we should clean them up
+    if (req.files && Array.isArray(req.files)) {
+      const files = req.files as S3MulterFile[];
+      console.log(`[createProperty] Cleaning up ${files.length} uploaded files due to error...`);
+
+      await Promise.allSettled(files.map(async (file) => {
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: file.key,
+          }));
+          console.log(`[createProperty] Cleaned up uploaded file: ${file.key}`);
+        } catch (e) {
+          console.error(`[createProperty] Error cleaning up file ${file.key}:`, e);
+        }
+      }));
+    }
+
     res
       .status(500)
       .json({ message: `Error creating property: ${err.message}` });
@@ -648,22 +638,20 @@ export const updateProperty = async (
     const newPhotoUrls: string[] = [];
     if (files && files.length > 0) {
       const uploadPromises = files.map((file) => {
-        if (!file.buffer || file.buffer.length === 0) {
-          return Promise.reject(new Error(`File ${file.originalname} is empty or corrupted`));
-        }
         const key = `properties/${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
-        const uploadParams = {
-          Bucket: process.env.S3_BUCKET_NAME!,
-          Key: key,
-          Body: file.buffer,
-          ContentType: file.mimetype,
-        };
-        return new Upload({ client: s3Client, params: uploadParams })
-          .done()
-          .then(() => {
+        return new Promise((resolve, reject) => {
+          const uploadStream = s3Client.send(new PutObjectCommand({
+            Bucket: process.env.S3_BUCKET_NAME!,
+            Key: key,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+          }));
+
+          uploadStream.then(() => {
             const url = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-            return url;
-          });
+            resolve(url);
+          }).catch(reject);
+        });
       });
       const uploadResults = await Promise.allSettled(uploadPromises);
       const failed = uploadResults.filter(r => r.status === 'rejected');
