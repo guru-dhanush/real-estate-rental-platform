@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Search, MapPin } from "lucide-react";
 import Button from "@/components/ui/button/Button";
 import { useDispatch } from "react-redux";
@@ -12,6 +13,7 @@ const HeroSection = () => {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,48 +32,98 @@ const HeroSection = () => {
     });
   }, [router]);
 
-  const handleSearch = async (value: string) => {
-    setSearchTerm(value);
-    if (value.length > 2) {
-      setIsLoading(true);
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-            value
-          )}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-          }&fuzzyMatch=true`
-        );
-        const data = await response?.json();
-        if (data.features) {
-          setSuggestions(data.features);
+  // Google Places AutocompleteService instance
+  const autocompleteServiceRef = useRef<any>(null);
+  // Simple in-memory cache for suggestions
+  const suggestionsCache = useRef<{ [key: string]: any[] }>({});
+
+  const fetchSuggestions = (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    // Check cache first
+    if (suggestionsCache.current[query]) {
+      setSuggestions(suggestionsCache.current[query]);
+      return;
+    }
+
+    setIsLoading(true);
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      setIsLoading(false);
+      return;
+    }
+    if (!autocompleteServiceRef.current) {
+      autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+    }
+    autocompleteServiceRef.current.getPlacePredictions(
+      { input: query },
+      (predictions: any[], status: string) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSuggestions(predictions);
+          suggestionsCache.current[query] = predictions;
+        } else {
+          setSuggestions([]);
         }
-      } catch (error) {
-        console.error("Error fetching location suggestions:", error);
-      } finally {
         setIsLoading(false);
       }
+    );
+  };
+
+  // Debounced effect for search
+  useEffect(() => {
+    if (debouncedSearchTerm) {
+      fetchSuggestions(debouncedSearchTerm);
     } else {
       setSuggestions([]);
     }
+  }, [debouncedSearchTerm]);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
   };
 
-  const handleLocationSelect = (feature: any) => {
-    const location = feature.place_name;
-    const [lng, lat] = feature.center;
+  // Get coordinates for a place_id using Places Details API
+  const getCoordinatesForPlaceId = (placeId: string) => {
+    return new Promise<[number, number] | undefined>((resolve) => {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        resolve(undefined);
+        return;
+      }
+      const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+      service.getDetails({ placeId }, (place: any, status: string) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place && place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          resolve([lng, lat]);
+        } else {
+          resolve(undefined);
+        }
+      });
+    });
+  };
+
+  const handleLocationSelect = async (prediction: any) => {
+    const location = prediction.description;
     setSearchTerm(location);
     setSuggestions([]);
+
+    let coordinates: [number, number] | undefined = undefined;
+    if (prediction.place_id) {
+      coordinates = await getCoordinatesForPlaceId(prediction.place_id);
+    }
 
     dispatch(
       setFilters({
         location: location,
-        coordinates: [lat, lng],
+        coordinates: coordinates,
       })
     );
 
     const params = new URLSearchParams({
       location: location,
-      lat: lat.toString(),
-      lng: lng.toString(),
+      ...(coordinates && { lat: coordinates[1].toString(), lng: coordinates[0].toString() }),
     });
     router.push(`/search?${params.toString()}`);
   };
@@ -188,7 +240,7 @@ const HeroSection = () => {
                         onClick={() => handleLocationSelect(suggestion)}
                       >
                         <MapPin className="h-4 w-4 text-[#004B93] mr-3" />
-                        <span className="text-gray-700">{suggestion.place_name}</span>
+                        <span className="text-gray-700">{suggestion.description}</span>
                       </div>
                     ))}
                   </div>

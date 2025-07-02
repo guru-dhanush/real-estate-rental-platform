@@ -7,7 +7,8 @@ import {
 } from "@/state";
 import { useAppSelector } from "@/state/redux";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useDispatch } from "react-redux";
 import { debounce } from "lodash";
 import { cleanParams, cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ const FiltersBar = () => {
   const viewMode = useAppSelector((state) => state.global.viewMode);
   const mapViewEnabled = useAppSelector((state) => state.global.mapViewEnabled);
   const [searchInput, setSearchInput] = useState(filters.location || "");
+  const debouncedSearchInput = useDebounce(searchInput, 300);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -51,51 +53,87 @@ const FiltersBar = () => {
     router.push(`${pathname}?${updatedSearchParams.toString()}`);
   }, 300);
 
-  const fetchSuggestions = async (query: string) => {
+  // Google Places AutocompleteService instance
+  const autocompleteServiceRef = useRef<any>(null);
+
+  // Simple in-memory cache for suggestions
+  const suggestionsCache = useRef<{ [key: string]: any[] }>({});
+
+  const fetchSuggestions = (query: string) => {
     if (query.length < 2) {
       setSuggestions([]);
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-          query
-        )}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
-        }&fuzzyMatch=true`
-      );
-      const data = await response.json();
-      if (data.features) {
-        setSuggestions(data.features);
-      }
-    } catch (error) {
-      console.error("Error fetching location suggestions:", error);
-    } finally {
-      setIsLoading(false);
+    // Check cache first
+    if (suggestionsCache.current[query]) {
+      setSuggestions(suggestionsCache.current[query]);
+      return;
     }
+
+    setIsLoading(true);
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      setIsLoading(false);
+      return;
+    }
+    if (!autocompleteServiceRef.current) {
+      autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+    }
+    autocompleteServiceRef.current.getPlacePredictions(
+      { input: query },
+      (predictions: any[], status: string) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSuggestions(predictions);
+          suggestionsCache.current[query] = predictions;
+        } else {
+          setSuggestions([]);
+        }
+        setIsLoading(false);
+      }
+    );
   };
 
-  const handleLocationSelect = (feature: any) => {
-    const location = feature.place_name;
-    const [lng, lat] = feature.center;
+  // Get coordinates for a place_id using Places Details API
+  const getCoordinatesForPlaceId = (placeId: string) => {
+    return new Promise<[number, number] | undefined>((resolve) => {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        resolve(undefined);
+        return;
+      }
+      const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+      service.getDetails({ placeId }, (place: any, status: string) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place && place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          resolve([lng, lat]);
+        } else {
+          resolve(undefined);
+        }
+      });
+    });
+  };
 
+  const handleLocationSelect = async (prediction: any) => {
+    const location = prediction.description;
     setSearchInput(location);
     setSuggestions([]);
     setShowSuggestions(false);
 
-    const coordinates: [number, number] = [lng, lat];
+    let coordinates: [number, number] | undefined = undefined;
+    if (prediction.place_id) {
+      coordinates = await getCoordinatesForPlaceId(prediction.place_id);
+    }
 
     const newFilters: FiltersState = {
       ...filters,
       location: location,
-      coordinates: coordinates,
+      coordinates: coordinates ? coordinates : filters.coordinates,
     };
 
     dispatch(
       setFilters({
         location: location,
-        coordinates: coordinates,
+        coordinates: coordinates ? coordinates : filters.coordinates,
       })
     );
     updateURL(newFilters);
@@ -114,14 +152,10 @@ const FiltersBar = () => {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchInput) {
-        fetchSuggestions(searchInput);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+    if (debouncedSearchInput) {
+      fetchSuggestions(debouncedSearchInput);
+    }
+  }, [debouncedSearchInput]);
 
   console.log("searchInput", searchInput);
 
@@ -167,7 +201,7 @@ const FiltersBar = () => {
                     onMouseDown={() => handleLocationSelect(suggestion)}
                   >
                     <MapPin className="h-5 w-4 text-primary-600 mr-3" />
-                    <span className="text-sm">{suggestion.place_name}</span>
+                    <span className="text-sm">{suggestion.description}</span>
                   </div>
                 ))}
               </div>

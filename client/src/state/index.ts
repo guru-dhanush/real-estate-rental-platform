@@ -33,7 +33,7 @@ export const initialState: InitialStateTypes = {
   },
   isFiltersFullOpen: false,
   viewMode: "grid",
-  mapViewEnabled: true,
+  mapViewEnabled: false,
 };
 
 export const globalSlice = createSlice({
