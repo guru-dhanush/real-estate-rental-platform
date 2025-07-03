@@ -1,0 +1,23 @@
+# Allow all search engines to crawl the website
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://www.dweltin.com/sitemap.xml
+
+# Disallow crawling of admin and API routes
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /*/private/
+
+# Crawl-delay: 10
+
+# Allow all robots to access the following directories
+Allow: /assets/
+Allow: /images/
+Allow: /css/
+Allow: /js/
+
+# Host
+Host: https://www.dweltin.com
