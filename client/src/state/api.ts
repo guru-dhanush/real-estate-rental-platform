@@ -19,6 +19,7 @@ export const api = createApi({
     prepareHeaders: async (headers) => {
       const session = await fetchAuthSession();
       const { idToken } = session.tokens ?? {};
+      console.log('✅ Auth token retrieved successfully', idToken);
       if (idToken) {
         headers.set("Authorization", `Bearer ${idToken}`);
       }
@@ -105,9 +106,9 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Properties" as const, id })),
-              { type: "Properties", id: "LIST" },
-            ]
+            ...result.map(({ id }) => ({ type: "Properties" as const, id })),
+            { type: "Properties", id: "LIST" },
+          ]
           : [{ type: "Properties", id: "LIST" }],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
@@ -142,9 +143,9 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Properties" as const, id })),
-              { type: "Properties", id: "LIST" },
-            ]
+            ...result.map(({ id }) => ({ type: "Properties" as const, id })),
+            { type: "Properties", id: "LIST" },
+          ]
           : [{ type: "Properties", id: "LIST" }],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
@@ -227,9 +228,9 @@ export const api = createApi({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ id }) => ({ type: "Properties" as const, id })),
-              { type: "Properties", id: "LIST" },
-            ]
+            ...result.map(({ id }) => ({ type: "Properties" as const, id })),
+            { type: "Properties", id: "LIST" },
+          ]
           : [{ type: "Properties", id: "LIST" }],
       async onQueryStarted(_, { queryFulfilled }) {
         await withToast(queryFulfilled, {
@@ -362,70 +363,70 @@ export const api = createApi({
       },
     }),
     // Add to your existing api.ts
-getChat: build.query<Chat, number>({
-  query: (id) => `chats/${id}`,
-  providesTags: (result, error, id) => [{ type: "Chats", id }],
-}),
+    getChat: build.query<Chat, number>({
+      query: (id) => `chats/${id}`,
+      providesTags: (result, error, id) => [{ type: "Chats", id }],
+    }),
 
-sendMessage: build.mutation<Message, { chatId: number; senderId: string; content: string }>({
-  query: (body) => ({
-    url: `chats/${body.chatId}/messages`,
-    method: "POST",
-    body,
-  }),
-  invalidatesTags: (result, error, { chatId }) => [{ type: "Chats", id: chatId }],
-}),
-createChat: build.mutation<Chat, { propertyId: number; tenantId: string; managerId: string }>({
-  query: (body) => ({
-    url: "chats",
-    method: "POST",
-    body,
-  }),
-  invalidatesTags: [{ type: "Chats", id: "LIST" }],
-}),
-getAllChats: build.query<Chat[], string>({
-  query: (tenantId) => `chats`,
-  providesTags: (result) =>
-    result
-      ? [
-          ...result.map(({ id }) => ({ type: "Chats" as const, id })),
-          { type: "Chats", id: "LIST" },
-        ]
-      : [{ type: "Chats", id: "LIST" }],
-  async onQueryStarted(_, { queryFulfilled }) {
-    await withToast(queryFulfilled, {
-      error: "Failed to fetch chats.",
-    });
-  },
-}),
-updateProperty: build.mutation<Property, { id: number; formData: FormData }>({
-  query: ({ id, formData }) => {
-    return {
-      url: `properties/${id}`,
-      method: 'PUT',
-      body: formData,
-      // Important: Don't set Content-Type header - the browser will set it automatically
-      // with the correct boundary for multipart/form-data
-      headers: {
-        // Explicitly empty headers object
+    sendMessage: build.mutation<Message, { chatId: number; senderId: string; content: string }>({
+      query: (body) => ({
+        url: `chats/${body.chatId}/messages`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (result, error, { chatId }) => [{ type: "Chats", id: chatId }],
+    }),
+    createChat: build.mutation<Chat, { propertyId: number; tenantId: string; managerId: string }>({
+      query: (body) => ({
+        url: "chats",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "Chats", id: "LIST" }],
+    }),
+    getAllChats: build.query<Chat[], string>({
+      query: (tenantId) => `chats`,
+      providesTags: (result) =>
+        result
+          ? [
+            ...result.map(({ id }) => ({ type: "Chats" as const, id })),
+            { type: "Chats", id: "LIST" },
+          ]
+          : [{ type: "Chats", id: "LIST" }],
+      async onQueryStarted(_, { queryFulfilled }) {
+        await withToast(queryFulfilled, {
+          error: "Failed to fetch chats.",
+        });
       },
-    }
-  },
-  invalidatesTags: (result) => [
-    { type: 'Properties', id: result?.id },
-    { type: 'Properties', id: 'LIST' },
-  ],
-}),
-deleteProperty: build.mutation<void, number>({
-  query: (id) => ({
-    url: `properties/${id}`,
-    method: "DELETE",
-  }),
-  invalidatesTags: (result, error, id) => [
-    { type: "Properties", id },
-    { type: "Properties", id: "LIST" },
-  ],
-}),
+    }),
+    updateProperty: build.mutation<Property, { id: number; formData: FormData }>({
+      query: ({ id, formData }) => {
+        return {
+          url: `properties/${id}`,
+          method: 'PUT',
+          body: formData,
+          // Important: Don't set Content-Type header - the browser will set it automatically
+          // with the correct boundary for multipart/form-data
+          headers: {
+            // Explicitly empty headers object
+          },
+        }
+      },
+      invalidatesTags: (result) => [
+        { type: 'Properties', id: result?.id },
+        { type: 'Properties', id: 'LIST' },
+      ],
+    }),
+    deleteProperty: build.mutation<void, number>({
+      query: (id) => ({
+        url: `properties/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "Properties", id },
+        { type: "Properties", id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -449,9 +450,9 @@ export const {
   useUpdateApplicationStatusMutation,
   useCreateApplicationMutation,
   useSendMessageMutation,
-useCreateChatMutation,
-useGetChatQuery,
-useGetAllChatsQuery,
-useDeletePropertyMutation,
-useUpdatePropertyMutation
+  useCreateChatMutation,
+  useGetChatQuery,
+  useGetAllChatsQuery,
+  useDeletePropertyMutation,
+  useUpdatePropertyMutation
 } = api;

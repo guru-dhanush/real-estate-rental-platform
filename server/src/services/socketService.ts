@@ -14,13 +14,181 @@ interface UserSocket {
 export class SocketService {
   private io: SocketServer;
   private connectedUsers: Map<string, UserSocket> = new Map();
+  private userRooms: Map<string, Set<string>> = new Map(); // Map of userId to their room IDs
+
+  private addToUserRooms(userId: string, room: string) {
+    if (!this.userRooms.has(userId)) {
+      this.userRooms.set(userId, new Set());
+    }
+    this.userRooms.get(userId)?.add(room);
+  }
+
+  private handleLeaveRoom(socket: any, room: string) {
+    socket.leave(room);
+    console.log(`🚪 Socket ${socket.id} left room: ${room}`);
+    console.log(`   Room ${room} now has ${this.io.sockets.adapter.rooms.get(room)?.size || 0} members`);
+  }
+
+  private handleJoinRoom(socket: any, room: string) {
+    socket.join(room);
+    console.log(`🚪 Socket ${socket.id} joined room: ${room}`);
+    console.log(`   Room ${room} now has ${this.io.sockets.adapter.rooms.get(room)?.size || 0} members`);
+  }
+
+  private async handleMessage(socket: any, data: any, callback: (response: any) => void) {
+    console.log('💬 New message received:', { socketId: socket.id, data });
+
+    try {
+      const { chatId, content, senderId } = data;
+
+      // Validate required fields
+      if (!chatId || !content || !senderId) {
+        console.error('Missing required message fields');
+        return callback({ success: false, error: 'Missing required fields' });
+      }
+
+      // Verify the sender is the authenticated user
+      const user = (socket as any).user;
+      if (!user || user.id !== senderId) {
+        console.error('Unauthorized message attempt');
+        return callback({ success: false, error: 'Unauthorized' });
+      }
+
+      // Save message to database (pseudo-code)
+      // const message = await prisma.message.create({
+      //   data: {
+      //     chatId,
+      //     content,
+      //     senderId,
+      //     timestamp: new Date()
+      //   }
+      // });
+
+      // Broadcast to room
+      socket.to(`chat:${chatId}`).emit('new_message', {
+        chatId,
+        message: {
+          ...data,
+          id: 'temp-' + Date.now(), // Use a temporary ID until saved to DB
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      // Send acknowledgment
+      callback({ success: true, messageId: 'temp-' + Date.now() });
+
+      // Broadcast chat update to all participants
+      this.io.emit('chat_updated', {
+        chatId,
+        lastMessage: content,
+        lastMessageAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Error handling message:', error);
+      callback({
+        success: false,
+        error: 'Failed to process message',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
 
   constructor(server: HttpServer) {
     this.io = new SocketServer(server, {
       cors: {
-        origin: "*", // Configure according to your frontend
-        methods: ["GET", "POST"],
+        origin: process.env.CORS_ORIGIN?.split(',') || '*',
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
+        allowedHeaders: ["authorization", "content-type"]
       },
+      path: "/socket.io/",
+      pingTimeout: 60000, // 60 seconds
+      pingInterval: 25000, // 25 seconds
+      cookie: false
+    });
+
+    this.io.use((socket, next) => {
+      // Middleware for authentication
+      console.log('🔍 New connection attempt:', {
+        auth: socket.handshake.auth,
+        query: socket.handshake.query,
+        headers: socket.handshake.headers
+      });
+
+      // Try to get token from different possible locations
+      let token = socket.handshake.auth?.token || 
+                 socket.handshake.query?.token ||
+                 (socket.handshake.headers.authorization?.startsWith('Bearer ') 
+                  ? socket.handshake.headers.authorization.split(' ')[1] 
+                  : socket.handshake.headers.authorization);
+
+      // If token is in auth object as a string, use it directly
+      if (!token && socket.handshake.auth && typeof socket.handshake.auth === 'object') {
+        token = socket.handshake.auth.token;
+      }
+
+      if (!token) {
+        console.log('❌ No token provided');
+        return next(new Error('Authentication error: No token provided'));
+      }
+
+      try {
+        console.log('🔑 Token received:', {
+          type: typeof token,
+          length: typeof token === 'string' ? token.length : 'N/A'
+        });
+
+        let decoded: any;
+        
+        // Handle different token formats
+        if (typeof token === 'string') {
+          // Try to decode as JWT
+          decoded = jwt.decode(token);
+          
+          if (!decoded && token.startsWith('{')) {
+            // Try to parse as JSON if it looks like a stringified object
+            try {
+              const tokenObj = JSON.parse(token);
+              if (tokenObj.payload) {
+                decoded = tokenObj.payload;
+              }
+            } catch (e) {
+              console.log('❌ Failed to parse token as JSON:', e);
+            }
+          }
+        } else if (typeof token === 'object' && token !== null) {
+          // If token is already an object with payload
+          if ('payload' in token) {
+            decoded = (token as any).payload;
+          } else {
+            // Use the object directly if it has required fields
+            decoded = token;
+          }
+        }
+
+        if (!decoded || !decoded.sub) {
+          console.log('❌ Invalid token format:', { decoded, token });
+          return next(new Error('Authentication error: Invalid token format'));
+        }
+
+        console.log('✅ Decoded token:', {
+          sub: decoded.sub,
+          role: decoded['custom:role'],
+          email: decoded.email
+        });
+
+        // Attach user info to socket for later use
+        (socket as any).user = {
+          id: decoded.sub,
+          type: (decoded['custom:role'] || '').toLowerCase()
+        };
+
+        next();
+      } catch (error) {
+        console.error('❌ Token verification failed:', error);
+        return next(new Error('Authentication error: Invalid token'));
+      }
     });
 
     this.initializeSocketEvents();
@@ -28,10 +196,175 @@ export class SocketService {
 
   private initializeSocketEvents() {
     this.io.on("connection", async (socket) => {
-      console.log(`Socket connected: ${socket.id}`);
+      // Set up heartbeat
+      socket.conn.on("ping", () => {
+        console.log(`❤️ Heartbeat from ${socket.id}`);
+      });
 
-      // Authenticate user on connection
+      // Log connection details
+      console.log(`🔌 New connection: ${socket.id}`, {
+        handshake: socket.handshake,
+        connected: socket.connected,
+        rooms: Array.from(socket.rooms)
+      });
+
+      // Handle disconnection
+      socket.on('disconnect', (reason) => {
+        console.log(`🔌 Disconnected: ${socket.id} (${reason})`);
+        // Clean up user rooms
+        if ((socket as any).user?.id) {
+          const userId = (socket as any).user.id;
+          this.connectedUsers.delete(socket.id);
+          console.log(`Removed user ${userId} from connected users`);
+        }
+      });
+
+      // Handle errors
+      socket.on('error', (error) => {
+        console.error(`Socket error from ${socket.id}:`, error);
+      });
+
+      // Handle authentication
+      socket.on('authenticate', (token: string, callback) => {
+        try {
+          const decoded: any = jwt.decode(token);
+          if (!decoded || !decoded.sub) {
+            console.error('Invalid token format', decoded, token);
+            return callback?.({
+              success: false,
+              error: 'Invalid token format'
+            });
+          }
+
+          const userId = decoded.sub;
+          const userType = decoded["custom:role"]?.toLowerCase() || "";
+
+          if (userType !== "tenant" && userType !== "manager") {
+            console.error('Invalid user type:', userType);
+            return callback?.({
+              success: false,
+              error: 'Invalid user type'
+            });
+          }
+
+          // Store user info
+          const userSocket = {
+            userId,
+            userType,
+            socketId: socket.id
+          };
+
+          this.connectedUsers.set(socket.id, userSocket);
+          console.log(`✅ Authenticated user ${userId} (${userType}) on socket ${socket.id}`);
+
+          // Join user to their personal room
+          socket.join(`user:${userId}`);
+
+          // Get user's chat rooms and join them
+          this.getUserChatRooms(userId, userType).then(chatRooms => {
+            chatRooms.forEach(chatId => {
+              const roomId = `chat:${chatId}`;
+              this.handleJoinRoom(socket, roomId);
+              this.addToUserRooms(userId, roomId);
+            });
+
+            // Send success response
+            callback?.({
+              success: true,
+              userId,
+              userType,
+              chatRooms
+            });
+          });
+
+        } catch (error) {
+          console.error('Authentication error:', error);
+          callback?.({
+            success: false,
+            error: 'Authentication failed',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      });
+
+      // Handle room joining
+      socket.on('join_room', ({ room }, callback) => {
+        if (!room) {
+          return callback?.({ success: false, error: 'Room ID is required' });
+        }
+
+        try {
+          this.handleJoinRoom(socket, room);
+          callback?.({ success: true, room });
+        } catch (error) {
+          console.error(`Error joining room ${room}:`, error);
+          callback?.({
+            success: false,
+            error: 'Failed to join room',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      });
+
+      // Handle room leaving
+      socket.on('leave_room', ({ room }, callback) => {
+        if (!room) {
+          return callback?.({ success: false, error: 'Room ID is required' });
+        }
+
+        try {
+          this.handleLeaveRoom(socket, room);
+          callback?.({ success: true, room });
+        } catch (error) {
+          console.error(`Error leaving room ${room}:`, error);
+          callback?.({
+            success: false,
+            error: 'Failed to leave room',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      });
+
+      // Handle message sending
+      socket.on('send_message', (data: any, callback: (response: any) => void) => {
+        console.log('📩 Received message:', data);
+        this.handleMessage(socket, data, (response) => {
+          console.log('Sending message ack:', response);
+          if (typeof callback === 'function') {
+            callback(response);
+          }
+
+          // Also emit a message_ack event for the client
+          socket.emit('message_ack', {
+            messageId: data.tempId || 'unknown',
+            ...response
+          });
+        });
+      });
+
+      // Send initial connection success
+      socket.emit('connected', {
+        success: true,
+        socketId: socket.id,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`🔌 New socket connection: ${socket.id}`, {
+        handshake: socket.handshake,
+        connected: socket.connected,
+        disconnected: socket.disconnected
+      });
+
+      // Log all socket events for debugging
+      const eventsToLog = ['connect', 'disconnect', 'error', 'authenticate', 'join_room', 'leave_room', 'send_message', 'message_ack'];
+      eventsToLog.forEach(event => {
+        socket.on(event, (data) => {
+          console.log(`📡 [${event}] from ${socket.id}:`, data || 'No data');
+        });
+      });
+
+      // Handle authentication
       socket.on("authenticate", async (token: string) => {
+        console.log(`🔑 Authentication attempt from ${socket.id}`);
         try {
           const decoded: any = jwt.decode(token);
           if (!decoded || !decoded.sub) {
@@ -40,6 +373,7 @@ export class SocketService {
           }
 
           const userId = decoded.sub;
+          console.log(`✅ Authenticated user ${userId} on socket ${socket.id}`);
           const userType = decoded["custom:role"]?.toLowerCase() || "";
 
           if (userType !== "tenant" && userType !== "manager") {
@@ -47,40 +381,32 @@ export class SocketService {
             return;
           }
 
-          // Store user connection
-          this.connectedUsers.set(userId, {
+          // Get user's chat rooms
+          const chatRooms = await this.getUserChatRooms(userId, userType);
+
+          // Join all chat rooms
+          chatRooms.forEach((chatId) => {
+            this.handleJoinRoom(socket, `chat:${chatId}`);
+            this.addToUserRooms(userId, `chat:${chatId}`);
+          });
+
+          // Store user info
+          const userSocket: UserSocket = {
             userId,
             userType,
             socketId: socket.id,
-          });
+          };
+          this.connectedUsers.set(userId, userSocket);
 
-          // Update user status in database
+          // Update user status
           await prisma.userStatus.upsert({
             where: { userId },
-            create: {
-              userId,
-              isOnline: true,
-              lastSeen: new Date(),
-            },
-            update: {
-              isOnline: true,
-              lastSeen: new Date(),
-            },
+            update: { isOnline: true, lastSeen: new Date() },
+            create: { userId, isOnline: true, lastSeen: new Date() },
           });
 
-          // Join user to their own room (for direct messages)
-          socket.join(userId);
-
-          // Join property chat rooms
-          const chatRooms = await this.getUserChatRooms(userId, userType);
-          chatRooms.forEach((roomId) => {
-            socket.join(`chat:${roomId}`);
-          });
-
-          // Broadcast user online status to relevant users
+          // Broadcast user status change
           this.broadcastUserStatus(userId, true);
-
-          console.log(`User authenticated: ${userId} (${userType})`);
         } catch (error) {
           console.error("Authentication error:", error);
           socket.disconnect();
@@ -93,79 +419,90 @@ export class SocketService {
         async (data: {
           chatId: number;
           content: string;
-          attachments?: string[];
-        }) => {
+          senderId: string;
+        }, callback: (response: any) => void) => {
+          this.handleMessage(socket, data, (response) => {
+            if (typeof callback === 'function') {
+              callback(response);
+            }
+          });
           try {
-            const userSocket = Array.from(this.connectedUsers.values()).find(
-              (u) => u.socketId === socket.id
-            );
-
+            const userSocket = this.connectedUsers.get(data.senderId);
             if (!userSocket) {
-              return;
-            }
-
-            const { chatId, content, attachments = [] } = data;
-
-            // Verify the chat exists and user is part of it
-            const chat = await prisma.chat.findUnique({
-              where: { id: chatId },
-              include: { property: true },
-            });
-
-            if (!chat || chat.isDeleted) {
-              return;
-            }
-
-            if (
-              userSocket.userType === "tenant" &&
-              chat.tenantId !== userSocket.userId
-            ) {
-              return;
-            }
-
-            if (
-              userSocket.userType === "manager" &&
-              chat.managerId !== userSocket.userId
-            ) {
               return;
             }
 
             // Create message in database
             const message = await prisma.message.create({
               data: {
-                chatId,
-                senderId: userSocket.userId,
-                content,
-                attachments,
+                content: data.content,
+                senderId: data.senderId,
+                chatId: data.chatId,
                 isRead: false,
               },
               include: {
-                chat: true,
+                chat: {
+                  select: {
+                    tenantId: true,
+                    managerId: true,
+                    propertyId: true,
+                    property: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
+                },
               },
             });
 
-            // Emit to chat room
-            this.io.to(`chat:${chatId}`).emit("new_message", {
-              ...message,
-              propertyTitle: chat.property.name,
-              propertyPrice: chat.property.pricePerMonth,
+            // Send acknowledgment to sender
+            socket.emit("message_ack", {
+              success: true,
+              messageId: message.id,
             });
 
-            // Send notification to recipient
+            // Notify recipient
             const recipientId =
-              userSocket.userType === "tenant" ? chat.managerId : chat.tenantId;
-            this.io.to(recipientId).emit("message_notification", {
-              chatId,
-              messageId: message.id,
-              senderId: userSocket.userId,
-              senderType: userSocket.userType,
-              propertyId: chat.propertyId,
-              propertyTitle: chat.property.name,
-              content:
-                content.substring(0, 50) + (content.length > 50 ? "..." : ""),
-            });
+              message.chat.tenantId === data.senderId
+                ? message.chat.managerId
+                : message.chat.tenantId;
+
+            // Ensure both users are in the chat room
+            if (socket.rooms.has(`chat:${data.chatId}`)) {
+              // Broadcast to both users in the chat
+              this.io.to(`chat:${data.chatId}`).emit("new_message", {
+                message,
+                chatId: data.chatId,
+                senderId: data.senderId,
+                senderType: userSocket.userType,
+                propertyId: message.chat.propertyId,
+                propertyTitle: message.chat.property.name,
+                content:
+                  message.content.substring(0, 50) +
+                  (message.content.length > 50 ? "..." : ""),
+              });
+
+              // Update chat unread count
+              await prisma.message.update({
+                where: { id: message.id },
+                data: {
+                  isRead: false,
+                },
+              });
+
+              // Notify about chat update
+              this.io.to(`chat:${data.chatId}`).emit("chat_updated", {
+                chatId: data.chatId,
+                unreadCount: 1,
+              });
+            }
           } catch (error) {
             console.error("Error sending message:", error);
+            socket.emit("message_ack", {
+              success: false,
+              error: "Failed to send message",
+            });
           }
         }
       );
