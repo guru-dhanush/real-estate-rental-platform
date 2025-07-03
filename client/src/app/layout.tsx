@@ -4,6 +4,7 @@ import './globals.css';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import Providers from './Providers';
+import CookieConsentWrapper from '@/components/CookieConsent';
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -24,7 +25,10 @@ export default function RootLayout({
         ></script>
         <Providers>
           <ThemeProvider>
-            <SidebarProvider>{children}</SidebarProvider>
+            <SidebarProvider>
+              {children}
+              <CookieConsentWrapper />
+            </SidebarProvider>
           </ThemeProvider>
         </Providers>
       </body>
