@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 
 const siteUrl = 'https://www.dweltin.com';
-const siteName = 'DWELTIN – Real Estate Platform for Smarter, Happier Living';
+const siteName = 'Dweltin – Real Estate Platform for Smarter, Happier Living';
 const description = 'Dweltin is a premium real estate rental platform connecting tenants with verified properties. Find your perfect home, apartment, or commercial space with our AI-powered property search.';
 const keywords = [
   'real estate', 'property rental', 'apartments for rent', 'homes for rent',

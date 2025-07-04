@@ -70,7 +70,7 @@ const Properties = () => {
                 <Edit className="w-4 h-4" />
               </Button>
               <Button
-                variant="destructive"
+                className="!bg-[#c9002b]"
                 onClick={() => handleDelete(property.id)}
               >
                 <Trash2 className="w-4 h-4" />
