@@ -33,11 +33,11 @@ export function ToggleSwitch({
         checked={isOn}
         onCheckedChange={onToggle}
         size={size}
-        className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-input"
+        className="data-[state=checked]:bg-[#004B93] data-[state=unchecked]:bg-input"
       />
       {label && (
-        <Label 
-          htmlFor="toggle-switch" 
+        <Label
+          htmlFor="toggle-switch"
           className={cn(
             "mb-0 cursor-pointer",
             size === "sm" && "text-xs"
