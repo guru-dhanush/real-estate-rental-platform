@@ -60,7 +60,7 @@ const Listings = () => {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between px-4 pt-1">
         <h3 className="text-sm font-bold w-[90%]">
           {properties.length}{" "}
           <span className="text-gray-700 font-normal">
