@@ -63,7 +63,10 @@ const SearchPage = () => {
         coordinates,
       };
 
-      dispatch(setFilters(filters));
+      if (location || propertyType || coordinates) {
+        dispatch(setFilters(filters));
+      }
+
       setIsGeolocationLoaded(true);
     };
 

@@ -21,7 +21,7 @@ interface InitialStateTypes {
 
 export const initialState: InitialStateTypes = {
   filters: {
-    location: "",
+    location: "Austin, TX, USA",
     beds: "any",
     baths: "any",
     propertyType: "any",
@@ -29,7 +29,7 @@ export const initialState: InitialStateTypes = {
     availableFrom: "any",
     priceRange: [null, null],
     squareFeet: [null, null],
-    coordinates: [-118.25, 34.05],
+    coordinates: [-97.7430608, 30.267153],
   },
   isFiltersFullOpen: false,
   viewMode: "grid",
