@@ -1,8 +1,10 @@
-import { Bath, Bed, Car, Heart, Home, MapPin, PawPrint, Star, ChevronDown, ChevronUp, MapPinned } from "lucide-react";
+import { Bath, Bed, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Heart, Home, MapPin, MapPinned, PawPrint, Star } from "lucide-react";
 import { LEGACY_PROPERTY_TYPES, AmenityIcons, HighlightIcons, PropertyTypeIcons } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from 'embla-carousel-react';
+import { EmblaOptionsType } from 'embla-carousel';
 
 const Card = ({
   property,
@@ -13,11 +15,66 @@ const Card = ({
   className,
   defaultExpanded = false
 }: CardProps & { defaultExpanded?: boolean }) => {
-  const [imgSrc, setImgSrc] = useState(
-    property.photoUrls?.[0] || "/placeholder.jpg"
-  );
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Enhanced Embla configuration for smooth transitions
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: true,
+    duration: 25, // Smooth transition duration (lower = faster)
+    dragFree: false,
+    containScroll: 'trimSnaps',
+    slidesToScroll: 1,
+    skipSnaps: false,
+    inViewThreshold: 0.7
+  });
+
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [scrollSnaps, setScrollSnaps] = useState<number[]>([]);
+  const [loadingStates, setLoadingStates] = useState<boolean[]>([]);
   const isLegacyProperty = LEGACY_PROPERTY_TYPES.includes(property.propertyType);
+
+  // Initialize loading states for all images
+  useEffect(() => {
+    const urls = property.photoUrls?.length ? property.photoUrls : ['/images/chat/chat.jpg'];
+    setLoadingStates(Array(urls.length).fill(true));
+  }, [property.photoUrls]);
+
+  const handleImageLoad = (index: number) => {
+    setLoadingStates(prev => {
+      const newStates = [...prev];
+      newStates[index] = false;
+      return newStates;
+    });
+  };
+
+  const scrollTo = useCallback((index: number) => emblaApi && emblaApi.scrollTo(index), [emblaApi]);
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    setScrollSnaps(emblaApi.scrollSnapList());
+    emblaApi.on('select', onSelect);
+    emblaApi.on('reInit', onSelect);
+    return () => {
+      emblaApi.off('select', onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const target = e.target as HTMLImageElement;
+    const fallback = target.parentElement?.querySelector('[data-fallback]') as HTMLElement;
+    if (fallback) {
+      target.style.display = 'none';
+      fallback.style.display = 'flex';
+    } else {
+      target.src = '/images/chat/chat.jpg';
+    }
+  };
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -27,18 +84,98 @@ const Card = ({
     setIsExpanded(defaultExpanded)
   }, [defaultExpanded])
 
-
   return (
     <div className={`relative bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 mb-5 border border-gray-100  ${className} `} >
-      {/* Image with overlays */}
-      <div className={`relative ${className}`}>
-        <Image
-          src={imgSrc}
-          alt={property.name}
-          fill
-          className="object-cover"
-          onError={() => setImgSrc("/placeholder.jpg")}
-        />
+      {/* Image slider with overlays */}
+      <div className={`relative aspect-video ${className}`}>
+        <div className="overflow-hidden rounded-t-2xl h-full" ref={emblaRef}>
+          {/* Enhanced container with smooth transitions */}
+          <div className="flex h-full transition-transform duration-500 ease-out">
+            {(property.photoUrls && property.photoUrls.length > 0 ? property.photoUrls : ['/images/chat/chat.jpg']).map((url, index) => (
+              <div key={index} className="flex-[0_0_100%] min-w-0 relative">
+                {/* Loading Skeleton */}
+                {loadingStates[index] && (
+                  <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-t-2xl" />
+                )}
+
+                {/* Actual Image */}
+                <Image
+                  src={url}
+                  alt={`${property.name} - ${index + 1}`}
+                  fill
+                  className={`object-cover transition-opacity duration-300 ease-in-out ${loadingStates[index] ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  onLoad={() => handleImageLoad(index)}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/images/chat/chat.jpg';
+                    handleImageLoad(index);
+                  }}
+                  priority={index === 0}
+                />
+
+                {/* Fallback for broken images */}
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 hidden" data-fallback>
+                  <Home className="w-8 h-8 text-gray-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Slider navigation dots with smooth transitions */}
+        {(property.photoUrls?.length || 1) > 1 && (
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1">
+            {scrollSnaps.map((_, index) => (
+              <button
+                key={index}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  scrollTo(index);
+                }}
+                className={`rounded-full transition-all duration-300 ease-out ${index === selectedIndex
+                  ? 'bg-white w-4 h-2 shadow-lg'
+                  : 'bg-white/50 w-2 h-2 hover:bg-white/70'
+                  }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Navigation arrows with enhanced styling */}
+        {(property.photoUrls?.length || 1) > 1 && (
+          <>
+            <button
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-1.5 rounded-full transition-all duration-200 z-10 hover:scale-110 active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (emblaApi) {
+                  emblaApi.scrollPrev();
+                }
+              }}
+              aria-label="Previous image"
+              type="button"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-1.5 rounded-full transition-all duration-200 z-10 hover:scale-110 active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (emblaApi) {
+                  emblaApi.scrollNext();
+                }
+              }}
+              aria-label="Next image"
+              type="button"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        )}
 
         {/* Overlay gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
@@ -161,7 +298,6 @@ const Card = ({
                     <>
                     </>
                   )}
-
                 </div>
               </div>
             )}
