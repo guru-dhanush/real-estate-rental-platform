@@ -60,6 +60,7 @@ const Properties = () => {
               onFavoriteToggle={() => { }}
               showFavoriteButton={false}
               propertyLink={`/managers/properties/${property.id}`}
+              className="h-100 w-full"
             />
             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button

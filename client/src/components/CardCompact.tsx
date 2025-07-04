@@ -30,7 +30,7 @@ const CardCompact = ({
         />
 
         {/* Feature Tags */}
-        <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+        {/* <div className="absolute bottom-2 left-2 flex flex-col gap-1">
           {property.isPetsAllowed && (
             <div className="flex items-center text-xs opacity-90">
               <PawPrint />
@@ -47,7 +47,7 @@ const CardCompact = ({
               </span>
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Price Tag */}
         <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm">
