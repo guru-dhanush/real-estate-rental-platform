@@ -25,7 +25,7 @@ const Listings = () => {
   );
   const [addFavorite] = useAddFavoritePropertyMutation();
   const [removeFavorite] = useRemoveFavoritePropertyMutation();
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const viewMode = useAppSelector((state) => state.global.viewMode);
   const [areAllExpanded, setAreAllExpanded] = useLocalStorage<boolean>('cardExpandedState', false);
   const filters = useAppSelector((state) => state.global.filters);
 
