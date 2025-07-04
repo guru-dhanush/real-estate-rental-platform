@@ -78,6 +78,7 @@ const Listings = () => {
                 onFavoriteToggle={() => handleFavoriteToggle(property.id)}
                 showFavoriteButton={!!authUser}
                 propertyLink={`/search/${property.id}`}
+                className="h-100 w-full"
               />
             ) : (
               <CardCompact

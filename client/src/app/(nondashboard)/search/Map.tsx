@@ -1,8 +1,12 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { useAppSelector } from "@/state/redux";
 import { useGetPropertiesQuery } from "@/state/api";
 import { Property } from "@/types/prismaTypes";
+import dynamic from 'next/dynamic';
+
+// Dynamically import MapCard with no SSR
+const MapCard = dynamic(() => import('./MapCard'), { ssr: false });
 
 const Map = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -145,55 +149,101 @@ const createPropertyMarker = (property: Property, map: google.maps.Map) => {
     property.pricePerMonth
   );
 
-  // Create info window content
-  const content = `
-    <div class="w-64 bg-white rounded-lg shadow-lg overflow-hidden">
-      ${property.photoUrls?.[0]
-      ? `
-        <div class="h-32 bg-gray-100 overflow-hidden">
-          <img src="${property.photoUrls[0]}" alt="${property.name}" class="w-full h-full object-cover" />
-        </div>
-      `
-      : ""
-    }
-      <div class="p-3">
-        <div class="flex justify-between items-start">
-          <h3 class="text-lg font-semibold text-gray-800 truncate">${property.name
-    }</h3>
-          <span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
-            ${property.propertyType}
-          </span>
-        </div>
-        <p class="text-gray-600 text-sm mt-1">
-          ${property.location.address.split(",")[0]}, ${property.location.city}
-        </p>
-        <div class="mt-2 flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <span class="flex items-center text-sm text-gray-500">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-              </svg>
-              ${property.beds} ${property.beds === 1 ? "bed" : "beds"}
-            </span>
-            <span class="flex items-center text-sm text-gray-500">
-              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-              ₹${formattedPrice}/mo
-            </span>
-          </div>
-          <a href="/search/${property.id
-    }" class="text-emerald-600 hover:text-emerald-800 text-sm font-medium">
-            View
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
+  // Create a container for the InfoWindow content
+  const content = document.createElement('div');
+  content.style.position = 'relative';
+  content.style.width = '250px';
+  content.style.overflow = 'visible';
+
+  // Create a close button
+  const closeButton = document.createElement('button');
+  closeButton.innerHTML = '×';
+  closeButton.style.position = 'absolute';
+  closeButton.style.top = '-10px';
+  closeButton.style.right = '-10px';
+  closeButton.style.background = '#fff';
+  closeButton.style.border = '2px solid #e2e8f0';
+  closeButton.style.borderRadius = '50%';
+  closeButton.style.width = '28px';
+  closeButton.style.height = '28px';
+  closeButton.style.display = 'flex';
+  closeButton.style.alignItems = 'center';
+  closeButton.style.justifyContent = 'center';
+  closeButton.style.cursor = 'pointer';
+  closeButton.style.zIndex = '1001';
+  closeButton.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+  closeButton.style.fontSize = '18px';
+  closeButton.style.fontWeight = 'bold';
+  closeButton.style.lineHeight = '1';
+  closeButton.style.padding = '0';
+  closeButton.style.outline = 'none';
+
+  closeButton.title = 'Close';
+  closeButton.style.transform = 'translate(0, 0)';
+  // Hover effect
+  closeButton.onmouseover = () => {
+    closeButton.style.background = '#f8fafc';
+    closeButton.style.transform = 'scale(1.1)';
+  };
+  closeButton.onmouseout = () => {
+    closeButton.style.background = '#fff';
+    closeButton.style.transform = 'scale(1)';
+  };
+
+  // Create a container for the card and close button
+  const cardWrapper = document.createElement('div');
+  cardWrapper.className = 'relative !h-[250px] !w-[250px]';
+
+  // Create container for the MapCard
+  const cardContainer = document.createElement('div');
+  cardContainer.className = 'h-full w-full';
+
+  // Position the close button absolutely within the wrapper
+  closeButton.style.position = 'absolute';
+  closeButton.style.top = '8px';
+  closeButton.style.right = '8px';
+  closeButton.style.zIndex = '10';
+
+  // Append elements
+  cardWrapper.appendChild(cardContainer);
+  cardWrapper.appendChild(closeButton);
+  content.appendChild(cardWrapper);
+
+  // Import ReactDOM client-side only
+  import('react-dom/client').then(({ createRoot }) => {
+    const rootInstance = createRoot(cardContainer);
+    rootInstance.render(
+      <MapCard
+        property={property}
+        isFavorite={false}
+        onFavoriteToggle={() => { }}
+        showFavoriteButton={false}
+        propertyLink={`/search/${property.id}`}
+      />
+    );
+  });
 
   const infoWindow = new google.maps.InfoWindow({
     content: content,
-    maxWidth: 300,
+    pixelOffset: new google.maps.Size(0, -45)
+  });
+
+  // Add click handler for the close button
+  closeButton.addEventListener('click', () => {
+    infoWindow.close();
+  });
+
+  // Add a class to the InfoWindow when it's opened
+  infoWindow.addListener('domready', () => {
+    const container = document.querySelector('.gm-style-iw-c');
+    if (container) {
+      container.classList.add('custom-infowindow');
+      // Make sure the close button is on top
+      const closeBtn = container.querySelector('button');
+      if (closeBtn) {
+        closeBtn.style.zIndex = '1000';
+      }
+    }
   });
 
   marker.addListener("click", () => {

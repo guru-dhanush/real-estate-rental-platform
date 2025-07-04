@@ -53,16 +53,39 @@ const COOKIE_TYPES: Record<string, CookieType> = {
 };
 
 export default function CookieConsent() {
-    const [isVisible, setIsVisible] = useState(true);
+    const [isVisible, setIsVisible] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [preferences, setPreferences] = useState<CookiePreferences>({});
 
     useEffect(() => {
-        const defaultPrefs = Object.entries(COOKIE_TYPES).reduce((acc, [key, value]) => {
-            acc[key] = value.checked;
-            return acc;
-        }, {} as CookiePreferences);
-        setPreferences(defaultPrefs);
+        // Check for existing consent in localStorage
+        const savedConsent = localStorage.getItem('cookieConsent');
+        const savedPreferences = localStorage.getItem('cookiePreferences');
+
+        if (savedConsent === 'accepted') {
+            // If consent was previously given, don't show the banner
+            setIsVisible(false);
+            
+            // Apply saved preferences if they exist
+            if (savedPreferences) {
+                setPreferences(JSON.parse(savedPreferences));
+            } else {
+                // Otherwise use defaults
+                const defaultPrefs = Object.entries(COOKIE_TYPES).reduce((acc, [key, value]) => {
+                    acc[key] = value.checked;
+                    return acc;
+                }, {} as CookiePreferences);
+                setPreferences(defaultPrefs);
+            }
+        } else {
+            // Show banner if no consent was given
+            const defaultPrefs = Object.entries(COOKIE_TYPES).reduce((acc, [key, value]) => {
+                acc[key] = value.checked;
+                return acc;
+            }, {} as CookiePreferences);
+            setPreferences(defaultPrefs);
+            setIsVisible(true);
+        }
     }, []);
 
     const handleAcceptAll = (): void => {
@@ -70,10 +93,20 @@ export default function CookieConsent() {
             acc[key] = true;
             return acc;
         }, {} as CookiePreferences);
+        
+        // Save to localStorage
+        localStorage.setItem('cookieConsent', 'accepted');
+        localStorage.setItem('cookiePreferences', JSON.stringify(allAccepted));
+        
         setIsVisible(false);
+        setPreferences(allAccepted);
     };
 
     const handleSavePreferences = (): void => {
+        // Save to localStorage
+        localStorage.setItem('cookieConsent', 'accepted');
+        localStorage.setItem('cookiePreferences', JSON.stringify(preferences));
+        
         setIsVisible(false);
     };
 

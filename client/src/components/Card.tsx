@@ -10,6 +10,7 @@ const Card = ({
   onFavoriteToggle,
   showFavoriteButton = true,
   propertyLink,
+  className
 }: CardProps) => {
   const [imgSrc, setImgSrc] = useState(
     property.photoUrls?.[0] || "/placeholder.jpg"
@@ -17,9 +18,9 @@ const Card = ({
   const isLegacyProperty = LEGACY_PROPERTY_TYPES.includes(property.propertyType);
 
   return (
-    <div className="relative bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 mb-5 border border-gray-100">
+    <div className={`relative bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 mb-5 border border-gray-100  ${className} `} >
       {/* Image with overlays */}
-      <div className="relative h-100 w-full">
+      < div className={`relative ${className}`}>
         <Image
           src={imgSrc}
           alt={property.name}
@@ -129,7 +130,7 @@ const Card = ({
         </div>
 
       </div>
-    </div>
+    </div >
   );
 };
 

@@ -96,6 +96,7 @@ declare global {
   }
 
   interface CardProps {
+    className?: string;
     property: Property;
     isFavorite: boolean;
     onFavoriteToggle: () => void;
@@ -137,4 +138,4 @@ declare global {
   }
 }
 
-export {};
+export { };

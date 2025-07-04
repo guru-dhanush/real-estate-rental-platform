@@ -39,6 +39,17 @@ const FiltersBar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Read location from URL on initial load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const location = searchParams.get('location');
+      if (location) {
+        setSearchInput(decodeURIComponent(location));
+      }
+    }
+  }, []);
+
   const updateURL = debounce((newFilters: FiltersState) => {
     const cleanFilters = cleanParams(newFilters);
     const updatedSearchParams = new URLSearchParams();
@@ -201,7 +212,7 @@ const FiltersBar = () => {
                     onMouseDown={() => handleLocationSelect(suggestion)}
                   >
                     <MapPin className="h-5 w-4 text-primary-600 mr-3" />
-                    <span className="text-sm">{suggestion.description}</span>
+                    <span className="text-gray-700">{suggestion.description}</span>
                   </div>
                 ))}
               </div>
@@ -280,7 +291,7 @@ const FiltersBar = () => {
                       onMouseDown={() => handleLocationSelect(suggestion)}
                     >
                       <MapPin className="h-5 w-4 text-primary-600 mr-3" />
-                      <span className="text-sm">{suggestion.place_name}</span>
+                      <span className="text-gray-700">{suggestion.description}</span>
                     </div>
                   ))}
                 </div>

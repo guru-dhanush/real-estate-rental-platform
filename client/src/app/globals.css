@@ -2,6 +2,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
@@ -880,4 +881,34 @@ span.flatpickr-weekday,
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+.gm-style-iw-chr{
+display: none !important;
+}
+
+/* Google Maps InfoWindow close button styles */
+.custom-infowindow .gm-ui-hover-effect {
+  margin-bottom: -10px !important;
+  height: 20px !important;
+  right: 100 !important;
+  top: 0 !important;
+}
+
+.custom-infowindow .gm-ui-hover-effect img {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 2px !important;
+}
+
+.custom-infowindow{
+max-width: none !important;
+max-height: none !important;
+}
+
+
+.gm-style-iw-d{
+  margin-top: 10px !important;
+  max-height: none !important;
 }
