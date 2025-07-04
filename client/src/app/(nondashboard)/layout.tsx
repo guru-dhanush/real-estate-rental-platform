@@ -31,7 +31,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     }
     setIsLoading(false);
   }, [authUser, router, pathname]);
-  console.log(authLoading, isLoading);
 
   if (authLoading || isLoading) return <Loading />;
 

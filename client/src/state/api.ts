@@ -19,7 +19,7 @@ export const api = createApi({
     prepareHeaders: async (headers) => {
       const session = await fetchAuthSession();
       const { idToken } = session.tokens ?? {};
-      console.log('✅ Auth token retrieved successfully', idToken);
+      // console.log('✅ Auth token retrieved successfully', idToken);
       if (idToken) {
         headers.set("Authorization", `Bearer ${idToken}`);
       }

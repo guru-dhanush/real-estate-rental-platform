@@ -124,13 +124,11 @@ const SearchPage = () => {
           setIsGeolocationLoaded(true);
         },
         (error) => {
-          console.log("Geolocation error:", error);
           setIsGeolocationLoaded(true);
         },
         { timeout: 10000 }
       );
     } else {
-      console.log("Geolocation not supported");
       setIsGeolocationLoaded(true);
     }
   }, [dispatch, isGeolocationLoaded]);

@@ -50,7 +50,6 @@ const Map = () => {
 
     // --- New: Create LatLngBounds to fit all markers ---
     const bounds = new google.maps.LatLngBounds();
-    console.log("properties", properties);
 
     // Add new markers
     properties.forEach((property) => {

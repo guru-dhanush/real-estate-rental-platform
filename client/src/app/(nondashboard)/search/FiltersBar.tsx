@@ -168,7 +168,6 @@ const FiltersBar = () => {
     }
   }, [debouncedSearchInput]);
 
-  console.log("searchInput", searchInput);
 
   return (
     <div className="w-full bg-white border-b border-gray-100">

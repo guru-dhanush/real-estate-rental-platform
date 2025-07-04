@@ -36,12 +36,12 @@ export const useChatSocket = (): ChatSocketService => {
     eventListenersRef.current.clear();
 
     const handleConnect = () => {
-      console.log('Socket connected');
+      // console.log('Socket connected');
       setIsConnected(true);
     };
 
     const handleDisconnect = (reason: string) => {
-      console.log('Socket disconnected:', reason);
+      // console.log('Socket disconnected:', reason);
       setIsConnected(false);
       if (reason === 'io server disconnect') {
         // Reconnect after a short delay
@@ -82,10 +82,10 @@ export const useChatSocket = (): ChatSocketService => {
 
   // Helper function to get authentication token
   const getAuthToken = useCallback(async (): Promise<string> => {
-    console.log('🔑 Fetching fresh auth token...');
+    // console.log('🔑 Fetching fresh auth token...');
     try {
       const session = await fetchAuthSession({ forceRefresh: true });
-      console.log('🔑 Auth session retrieved');
+      // console.log('🔑 Auth session retrieved');
 
       // Handle different token formats from AWS Amplify
       let token: string | undefined;
@@ -111,7 +111,7 @@ export const useChatSocket = (): ChatSocketService => {
         length: token.length,
         preview: token.length > 10 ? `${token.substring(0, 10)}...` : token
       };
-      console.log('✅ Auth token retrieved successfully', tokenInfo);
+      // console.log('✅ Auth token retrieved successfully', tokenInfo);
 
       return token;
     } catch (error) {
@@ -121,7 +121,7 @@ export const useChatSocket = (): ChatSocketService => {
   }, []);
 
   const connect = useCallback(async (): Promise<void> => {
-    console.log('🔌 Attempting to connect to socket server...');
+    // console.log('🔌 Attempting to connect to socket server...');
 
     // Validate required info
     if (!authUser?.cognitoInfo?.userId) {
@@ -138,13 +138,13 @@ export const useChatSocket = (): ChatSocketService => {
 
     // If already connected, resolve immediately
     if (socketRef.current?.connected) {
-      console.log('✅ Socket already connected');
+      // console.log('✅ Socket already connected');
       return;
     }
 
     // Disconnect existing socket if any
     if (socketRef.current) {
-      console.log('🔌 Disconnecting existing socket...');
+      // console.log('🔌 Disconnecting existing socket...');
       socketRef.current.disconnect();
       socketRef.current = null;
     }
@@ -157,14 +157,14 @@ export const useChatSocket = (): ChatSocketService => {
         throw new Error('WebSocket URL not configured');
       }
 
-      console.log('🔌 Connecting to WebSocket URL:', WS_URL);
+      // console.log('🔌 Connecting to WebSocket URL:', WS_URL);
 
       // Create socket connection with proper URL formatting
       const normalizedUrl = WS_URL.endsWith('/')
         ? WS_URL.slice(0, -1)
         : WS_URL;
 
-      console.log('🔌 Normalized WebSocket URL:', normalizedUrl);
+      // console.log('🔌 Normalized WebSocket URL:', normalizedUrl);
 
       // Create socket connection - removed duplicate properties
       const socket = io(normalizedUrl, {
@@ -199,7 +199,7 @@ export const useChatSocket = (): ChatSocketService => {
       setupSocketListeners(socket);
 
       // Setup connection status tracking
-      console.log('🔄 Setting up socket connection...');
+      // console.log('🔄 Setting up socket connection...');
 
       // Wait for connection or error
       await new Promise<void>((resolve, reject) => {
@@ -208,7 +208,7 @@ export const useChatSocket = (): ChatSocketService => {
         }, 10000);
 
         const onConnect = () => {
-          console.log('✅ Socket connected successfully');
+          // console.log('✅ Socket connected successfully');
           clearTimeout(timeout);
           cleanup();
           resolve();
@@ -228,7 +228,7 @@ export const useChatSocket = (): ChatSocketService => {
 
         // If already connected, resolve immediately
         if (socket.connected) {
-          console.log('✅ Socket already connected');
+          // console.log('✅ Socket already connected');
           cleanup();
           resolve();
           return;
@@ -240,7 +240,7 @@ export const useChatSocket = (): ChatSocketService => {
 
         // Manually connect if not already connected
         if (!socket.connected) {
-          console.log('🔄 Manually connecting socket...');
+          // console.log('🔄 Manually connecting socket...');
           socket.connect();
         }
       });
@@ -266,9 +266,9 @@ export const useChatSocket = (): ChatSocketService => {
   }, []);
 
   const joinRoom = useCallback(async (roomId: string) => {
-    console.log(`🚪 Attempting to join room: ${roomId}`);
+    // console.log(`🚪 Attempting to join room: ${roomId}`);
     if (!socketRef.current) {
-      console.log('No active socket, connecting first...');
+      // console.log('No active socket, connecting first...');
       try {
         await connect();
       } catch (error) {
@@ -278,13 +278,13 @@ export const useChatSocket = (): ChatSocketService => {
     }
 
     if (!chatRoomsRef.current.has(roomId)) {
-      console.log(`Joining room: ${roomId}`);
+      // console.log(`Joining room: ${roomId}`);
       chatRoomsRef.current.add(roomId);
       socketRef.current?.emit('join_room' as any, { room: roomId }, (response: any) => {
-        console.log(`✅ Joined room ${roomId} successfully`, response);
+        // console.log(`✅ Joined room ${roomId} successfully`, response);
       });
     } else {
-      console.log(`Already in room: ${roomId}`);
+      // console.log(`Already in room: ${roomId}`);
     }
   }, [connect]);
 
@@ -296,11 +296,11 @@ export const useChatSocket = (): ChatSocketService => {
   }, []);
 
   const sendMessage = useCallback(async (chatId: number, content: string): Promise<void> => {
-    console.log('📤 Sending message:', { chatId, content });
+    // console.log('📤 Sending message:', { chatId, content });
 
     // Ensure we have a valid socket connection
     if (!socketRef.current) {
-      console.log('No socket available, connecting...');
+      // console.log('No socket available, connecting...');
       try {
         await connect();
       } catch (error) {
@@ -326,7 +326,7 @@ export const useChatSocket = (): ChatSocketService => {
         timestamp: new Date().toISOString()
       };
 
-      console.log('📩 Emitting message:', messageData);
+      // console.log('📩 Emitting message:', messageData);
 
       const timeout = setTimeout(() => {
         console.error('Message send timeout');
@@ -335,7 +335,7 @@ export const useChatSocket = (): ChatSocketService => {
       }, 10000); // Increased timeout to 10 seconds
 
       const onAck = (response: any) => {
-        console.log('📬 Message ACK received:', response);
+        // console.log('📬 Message ACK received:', response);
         clearTimeout(timeout);
         socket.off('message_ack' as any, onAck);
 

@@ -85,27 +85,21 @@ const ChatContainer = ({
 
     // Handle new messages
     const handleNewMessage = useCallback((messageData: any) => {
-        console.log("🚀 Incoming messageData:", messageData);
 
         if (!localChat) {
-            console.log("❌ localChat is null or undefined. Skipping.");
             return;
         }
 
         if (messageData.chatId !== localChat.id) {
-            console.log(`❌ Chat ID mismatch: messageData.chatId=${messageData.chatId}, localChat.id=${localChat.id}`);
             return;
         }
 
-        console.log("✅ Proceeding with message update.");
 
         setLocalChat((prevChat) => {
             if (!prevChat) {
-                console.log("⚠️ prevChat is null. Returning as-is.");
                 return prevChat;
             }
 
-            console.log("📦 Previous Chat State:", prevChat);
 
             // Check for duplicate messages by ID first (most reliable)
             const messageExistsById = prevChat.messages?.some(
@@ -126,7 +120,6 @@ const ChatContainer = ({
             );
 
             if (messageExistsById || similarMessageExists) {
-                console.log("⚠️ Duplicate or similar message found. Skipping update.");
                 return prevChat;
             }
 
@@ -143,7 +136,6 @@ const ChatContainer = ({
                 );
 
                 if (optimisticIndex !== -1) {
-                    console.log(`♻️ Replacing optimistic message at index ${optimisticIndex}`);
                     messages[optimisticIndex] = newMessage;
                     return {
                         ...prevChat,
@@ -153,7 +145,6 @@ const ChatContainer = ({
                 }
             }
 
-            console.log("➕ Appending new message:", newMessage);
 
             return {
                 ...prevChat,
@@ -163,7 +154,6 @@ const ChatContainer = ({
         });
 
         if (isScrolledToBottom) {
-            console.log("📜 Auto-scrolling to bottom...");
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);

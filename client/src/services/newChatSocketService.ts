@@ -35,16 +35,16 @@ export const useChatSocket = (): ChatSocketService => {
     eventListenersRef.current.clear();
 
     const handleConnect = () => {
-      console.log('Socket connected');
+      // console.log('Socket connected');
       const token = localStorage.getItem('idToken');
       if (token) {
-        console.log('Authenticating socket...');
+        // console.log('Authenticating socket...');
         socket.emit('authenticate', token);
       }
     };
 
     const handleAuthenticated = () => {
-      console.log('Socket authenticated successfully');
+      // console.log('Socket authenticated successfully');
       setIsConnected(true);
       // Rejoin any existing chat rooms
       chatRoomsRef.current.forEach(room => {
@@ -59,7 +59,7 @@ export const useChatSocket = (): ChatSocketService => {
     };
 
     const handleDisconnect = (reason: string) => {
-      console.log('Socket disconnected:', reason);
+      // console.log('Socket disconnected:', reason);
       setIsConnected(false);
       if (reason === 'io server disconnect') {
         // Reconnect after a short delay
@@ -104,7 +104,7 @@ export const useChatSocket = (): ChatSocketService => {
         // Get fresh token
         const session = await fetchAuthSession();
         const { idToken } = session.tokens ?? {};
-        
+
         if (!idToken) {
           throw new Error('No authentication token available');
         }
@@ -183,7 +183,7 @@ export const useChatSocket = (): ChatSocketService => {
         socketRef.current?.off(event, listener);
       });
       eventListenersRef.current.clear();
-      
+
       // Disconnect the socket
       socketRef.current.disconnect();
       socketRef.current = null;
@@ -203,7 +203,7 @@ export const useChatSocket = (): ChatSocketService => {
     if (!chatRoomsRef.current.has(roomId)) {
       chatRoomsRef.current.add(roomId);
       socketRef.current.emit('join_room', { room: roomId });
-      console.log(`Joined chat room: ${roomId}`);
+      // console.log(`Joined chat room: ${roomId}`);
     }
   }, [connect]);
 
@@ -211,7 +211,7 @@ export const useChatSocket = (): ChatSocketService => {
     if (socketRef.current && chatRoomsRef.current.has(roomId)) {
       socketRef.current.emit('leave_room', { room: roomId });
       chatRoomsRef.current.delete(roomId);
-      console.log(`Left chat room: ${roomId}`);
+      // console.log(`Left chat room: ${roomId}`);
     }
   }, []);
 
@@ -249,7 +249,7 @@ export const useChatSocket = (): ChatSocketService => {
       const ackHandler = (data: { success: boolean; error?: string; messageId: string }) => {
         cleanup();
         if (data.success) {
-          console.log('Message sent successfully:', data.messageId);
+          // console.log('Message sent successfully:', data.messageId);
           resolve();
         } else {
           reject(new Error(data.error || 'Failed to send message'));
@@ -263,7 +263,7 @@ export const useChatSocket = (): ChatSocketService => {
 
   const onMessage = useCallback((callback: (data: any) => void) => {
     const handler = (data: any) => {
-      console.log('New message received:', data);
+      // console.log('New message received:', data);
       callback(data);
     };
 
@@ -280,7 +280,7 @@ export const useChatSocket = (): ChatSocketService => {
 
   const onChatUpdate = useCallback((callback: (update: { chatId: number; unreadCount: number }) => void) => {
     const handler = (update: { chatId: number; unreadCount: number }) => {
-      console.log('Chat updated:', update);
+      // console.log('Chat updated:', update);
       callback(update);
     };
 
