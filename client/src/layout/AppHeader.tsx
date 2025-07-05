@@ -4,6 +4,9 @@ import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
 import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { ChevronDown, Loader2 } from "lucide-react";
+import { useUpdateUserRoleMutation } from "@/state/api";
 
 interface AuthUser {
   userInfo: {
@@ -20,8 +23,24 @@ interface AppHeaderProps {
 
 const AppHeader: React.FC<AppHeaderProps> = ({ authUser }) => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [updateUserRole, { isLoading }] = useUpdateUserRoleMutation();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showRoleDropdown) {
+        setShowRoleDropdown(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showRoleDropdown]);
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -91,6 +110,86 @@ const AppHeader: React.FC<AppHeaderProps> = ({ authUser }) => {
           </button>
 
           <Dweltin className="lg:hidden" />
+
+          {/* Role Switcher */}
+          <div className="hidden lg:flex items-center ml-4">
+            <div className="relative group">
+              <button 
+                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRoleDropdown(!showRoleDropdown);
+                }}
+              >
+                <span className="capitalize">{authUser.userRole}</span>
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </button>
+              {showRoleDropdown && (
+                <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                  <div className="py-1">
+                    <button
+                      disabled={isLoading}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (authUser.userRole === 'manager') {
+                          setShowRoleDropdown(false);
+                          return;
+                        }
+                        try {
+                          await updateUserRole({ role: 'manager' }).unwrap();
+                          window.location.href = '/managers/properties';
+                        } catch (error) {
+                          console.error('Role switch error:', error);
+                          toast.error('Failed to switch to manager role');
+                        }
+                      }}
+                      className={`flex items-center w-full text-left px-4 py-2 text-sm ${
+                        authUser.userRole === 'manager'
+                          ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                      } ${isLoading ? 'opacity-70' : ''}`}
+                    >
+                      {isLoading && authUser.userRole !== 'manager' ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Switching...
+                        </>
+                      ) : 'Manager'}
+                    </button>
+                    <button
+                      disabled={isLoading}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (authUser.userRole === 'tenant') {
+                          setShowRoleDropdown(false);
+                          return;
+                        }
+                        try {
+                          await updateUserRole({ role: 'tenant' }).unwrap();
+                          window.location.href = '/tenants/favorites';
+                        } catch (error) {
+                          console.error('Role switch error:', error);
+                          toast.error('Failed to switch to tenant role');
+                        }
+                      }}
+                      className={`flex items-center w-full text-left px-4 py-2 text-sm ${
+                        authUser.userRole === 'tenant'
+                          ? 'bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                      } ${isLoading ? 'opacity-70' : ''}`}
+                    >
+                      {isLoading && authUser.userRole !== 'tenant' ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Switching...
+                        </>
+                      ) : 'Tenant'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           <button
             onClick={toggleApplicationMenu}

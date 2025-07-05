@@ -12,6 +12,7 @@ import {
 import "@aws-amplify/ui-react/styles.css";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { getCurrentUser, updateUserAttributes, fetchAuthSession } from "aws-amplify/auth";
 
 // https://docs.amplify.aws/gen1/javascript/tools/libraries/configure-categories/
 Amplify.configure({
@@ -340,6 +341,28 @@ const AuthUI = ({
 };
 
 const LAST_ATTEMPTED_PATH_KEY = "last_attempted_dashboard_path";
+
+export const switchUserRole = async (newRole: string) => {
+  try {
+    const user = await getCurrentUser();
+    await updateUserAttributes({
+      userAttributes: {
+        'custom:role': newRole
+      }
+    });
+    
+    // Force refresh tokens to get the updated attributes
+    await fetchAuthSession();
+    
+    // Redirect based on new role
+    window.location.href = newRole === 'manager' 
+      ? '/managers/properties' 
+      : '/tenants/favorites';
+  } catch (error) {
+    console.error('Error switching role:', error);
+    throw error;
+  }
+};
 
 const Auth = ({ children }: { children: React.ReactNode }) => {
   const { user, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);

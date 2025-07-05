@@ -9,9 +9,20 @@ import {
   Property,
   Tenant,
 } from "@/types/prismaTypes";
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { fetchAuthSession, getCurrentUser } from "aws-amplify/auth";
+import { createApi, fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import { fetchAuthSession, getCurrentUser, updateUserAttributes } from "aws-amplify/auth";
 import { FiltersState } from ".";
+
+// Utility function to refresh the auth session
+const refreshAuthSession = async () => {
+  try {
+    const session = await fetchAuthSession({ forceRefresh: true });
+    return session.tokens?.idToken?.payload;
+  } catch (error) {
+    console.error('Error refreshing auth session:', error);
+    throw error;
+  }
+};
 
 export const api = createApi({
   baseQuery: fetchBaseQuery({
@@ -35,7 +46,8 @@ export const api = createApi({
     "Leases",
     "Payments",
     "Applications",
-    "Chats"
+    "Chats",
+    "AuthUser"
   ],
   endpoints: (build) => ({
     getAuthUser: build.query<User, void>({
@@ -43,6 +55,10 @@ export const api = createApi({
         try {
           const session = await fetchAuthSession();
           const { idToken } = session.tokens ?? {};
+          if (!idToken) {
+            throw new Error('No authentication token found');
+          }
+          
           const user = await getCurrentUser();
           const userRole = idToken?.payload["custom:role"] as string;
 
@@ -74,9 +90,36 @@ export const api = createApi({
             },
           };
         } catch (error: any) {
+          console.error('Error in getAuthUser:', error);
           return { error: error.message || "Could not fetch user data" };
         }
       },
+      providesTags: ['AuthUser'],
+    }),
+
+    updateUserRole: build.mutation<{ success: boolean }, { role: string }>({
+      queryFn: async ({ role }, _queryApi, _extraOptions, fetchWithBQ) => {
+        try {
+          // Update the role in Cognito
+          await updateUserAttributes({
+            userAttributes: {
+              'custom:role': role
+            }
+          });
+
+          // Force refresh the session to get the updated role
+          await refreshAuthSession();
+          
+          // Invalidate the auth user query to force a refetch
+          _queryApi.dispatch(api.util.invalidateTags(['AuthUser']));
+          
+          return { data: { success: true } };
+        } catch (error: any) {
+          console.error('Error updating user role:', error);
+          return { error: { status: 'CUSTOM_ERROR', error: error.message } };
+        }
+      },
+      invalidatesTags: ['AuthUser'],
     }),
 
     // property related endpoints
@@ -432,6 +475,7 @@ export const api = createApi({
 
 export const {
   useGetAuthUserQuery,
+  useUpdateUserRoleMutation,
   useUpdateTenantSettingsMutation,
   useUpdateManagerSettingsMutation,
   useGetPropertiesQuery,
