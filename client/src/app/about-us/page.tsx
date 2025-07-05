@@ -264,7 +264,7 @@ const AboutUs = () => {
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="py-24 bg-gradient-to-br from-[#004B93] to-[#c9002b]"
+                    className="py-24 bg-gradient-to-br from-[#156996] to-[#082748]"
                 >
                     <div className="max-w-4xl mx-auto px-6 text-center">
                         <h2 className="text-4xl font-bold text-white mb-6">
